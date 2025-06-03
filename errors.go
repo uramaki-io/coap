@@ -15,10 +15,20 @@ type UnsupportedVersion struct {
 	Version uint8
 }
 type InvalidTokenLength struct {
-	Length uint8
+	Length int
 }
 
 type UnsupportedExtendError struct{}
+
+type OptionValueLengthError struct {
+	OptionDef
+	Length uint16
+}
+
+type OptionValueFormatError struct {
+	OptionDef
+	Requested ValueFormat
+}
 
 func (e ParseError) Error() string {
 	return fmt.Sprintf("parse error at offset %d: %v", e.Offset, e.Cause)
@@ -42,4 +52,12 @@ func (e UnsupportedExtendError) Error() string {
 
 func (e TruncatedError) Error() string {
 	return fmt.Sprintf("truncated input, expected %d bytes", e.Expected)
+}
+
+func (e OptionValueLengthError) Error() string {
+	return fmt.Sprintf("expected option %q value length between %d and %d, got %d", e.Name, e.MinLen, e.MaxLen, e.Length)
+}
+
+func (e OptionValueFormatError) Error() string {
+	return fmt.Sprintf("unsupported option %q value format %q, actual %q", e.Name, e.Requested, e.ValueFormat)
 }

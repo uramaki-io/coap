@@ -2,12 +2,16 @@ package coap
 
 import (
 	"encoding/binary"
-	"fmt"
 )
 
-type Schema struct {
-	options map[uint16]OptionDef
-}
+const (
+	ExtendByte    = uint8(0x0D) // 13
+	ExtendDword   = uint8(0x0E) // 14
+	ExtendInvalid = uint8(0x0F) // 15
+
+	ExtendByteOffset  = uint16(ExtendByte)               // 13
+	ExtendDwordOffset = uint16(256) + uint16(ExtendByte) // 269
+)
 
 type OptionDef struct {
 	Name        string
@@ -34,94 +38,32 @@ const (
 	ValueFormatString
 )
 
-type OptionValueLengthError struct {
-	OptionDef
-	Length uint16
-}
-
-func (e OptionValueLengthError) Error() string {
-	return fmt.Sprintf("expected option %q value length between %d and %d, got %d", e.Name, e.MinLen, e.MaxLen, e.Length)
-}
-
-type OptionValueFormatError struct {
-	OptionDef
-	Requested ValueFormat
-}
-
-func (e OptionValueFormatError) Error() string {
-	return fmt.Sprintf("unsupported option %q value format %q, actual %q", e.Name, e.Requested, e.ValueFormat)
-}
-
-var (
-	IfMatch       = OptionDef{Code: 1, Name: "IfMatch", ValueFormat: ValueFormatOpaque, MaxLen: 8}
-	UriHost       = OptionDef{Code: 3, Name: "UriHost", ValueFormat: ValueFormatString, MinLen: 1, MaxLen: 255}
-	ETag          = OptionDef{Code: 4, Name: "ETag", ValueFormat: ValueFormatOpaque, MinLen: 1, MaxLen: 8}
-	IfNoneMatch   = OptionDef{Code: 5, Name: "IfNoneMatch", ValueFormat: ValueFormatEmpty}
-	Observe       = OptionDef{Code: 6, Name: "Observe", ValueFormat: ValueFormatUint, MaxLen: 3}
-	UriPort       = OptionDef{Code: 7, Name: "UriPort", ValueFormat: ValueFormatUint, MaxLen: 2}
-	LocationPath  = OptionDef{Code: 8, Name: "LocationPath", ValueFormat: ValueFormatString, MaxLen: 255}
-	UriPath       = OptionDef{Code: 11, Name: "UriPath", ValueFormat: ValueFormatString, MaxLen: 255}
-	ContentFormat = OptionDef{Code: 12, Name: "ContentFormat", ValueFormat: ValueFormatUint, MaxLen: 2}
-	MaxAge        = OptionDef{Code: 14, Name: "MaxAge", ValueFormat: ValueFormatUint, MaxLen: 4}
-	UriQuery      = OptionDef{Code: 15, Name: "UriQuery", ValueFormat: ValueFormatString, MaxLen: 255}
-	Accept        = OptionDef{Code: 17, Name: "Accept", ValueFormat: ValueFormatUint, MaxLen: 2}
-	LocationQuery = OptionDef{Code: 20, Name: "LocationQuery", ValueFormat: ValueFormatString, MaxLen: 255}
-	Block1        = OptionDef{Code: 27, Name: "Block1", ValueFormat: ValueFormatUint, MaxLen: 3}
-	Block2        = OptionDef{Code: 23, Name: "Block2", ValueFormat: ValueFormatUint, MaxLen: 3}
-	ProxyUri      = OptionDef{Code: 35, Name: "ProxyUri", ValueFormat: ValueFormatString, MinLen: 1, MaxLen: 1034}
-	ProxyScheme   = OptionDef{Code: 39, Name: "ProxyScheme", ValueFormat: ValueFormatString, MinLen: 1, MaxLen: 255}
-	Size1         = OptionDef{Code: 60, Name: "Size1", ValueFormat: ValueFormatUint, MaxLen: 4}
-	Size2         = OptionDef{Code: 28, Name: "Size2", ValueFormat: ValueFormatUint, MaxLen: 4}
-	NoResponse    = OptionDef{Code: 258, Name: "NoResponse", ValueFormat: ValueFormatUint, MaxLen: 1}
-)
-
-var DefaultSchema = NewSchema(
-	IfMatch,
-	UriHost,
-	ETag,
-	IfNoneMatch,
-	Observe,
-	UriPort,
-	LocationPath,
-	UriPath,
-	ContentFormat,
-	MaxAge,
-	UriQuery,
-	Accept,
-	LocationQuery,
-	Block1,
-	Block2,
-	ProxyUri,
-	ProxyScheme,
-	Size1,
-	Size2,
-	NoResponse,
-)
-
-func NewSchema(defs ...OptionDef) *Schema {
-	options := make(map[uint16]OptionDef, len(defs))
-	for _, def := range defs {
-		options[def.Code] = def
-	}
-
-	return &Schema{
-		options: options,
+func (f ValueFormat) String() string {
+	switch f {
+	case ValueFormatEmpty:
+		return "empty"
+	case ValueFormatUint:
+		return "uint"
+	case ValueFormatOpaque:
+		return "opaque"
+	case ValueFormatString:
+		return "string"
+	default:
+		return "unknown"
 	}
 }
 
-func (s *Schema) OptionDef(code uint16) OptionDef {
-	def, ok := s.options[code]
-	if !ok {
-		return OptionDef{
-			Code:        code,
-			Name:        fmt.Sprintf("Option(%d)", code),
-			ValueFormat: ValueFormatOpaque,
-			MinLen:      0,
-			MaxLen:      1034,
-		}
-	}
+// Critical returns true if option critical bit is set.
+func (o OptionDef) Critical() bool {
+	return o.Code&0x01 == 0x01
+}
 
-	return def
+func (o OptionDef) Unsafe() bool {
+	return o.Code&0x02 == 0x02
+}
+
+func (o OptionDef) NoCacheKey() bool {
+	return o.Code&0x1E == 0x1c
 }
 
 func (o OptionDef) String() string {
@@ -160,6 +102,14 @@ func (o *Option) SetUint(value uint32) error {
 		}
 	}
 
+	length := len32(value)
+	if length < o.MinLen || length > o.MaxLen {
+		return OptionValueLengthError{
+			OptionDef: o.OptionDef,
+			Length:    length,
+		}
+	}
+
 	o.uintValue = value
 
 	return nil
@@ -181,6 +131,14 @@ func (o *Option) SetBytes(value []byte) error {
 		return OptionValueFormatError{
 			OptionDef: o.OptionDef,
 			Requested: ValueFormatOpaque,
+		}
+	}
+
+	length := uint16(len(value))
+	if length < o.MinLen || length > o.MaxLen {
+		return OptionValueLengthError{
+			OptionDef: o.OptionDef,
+			Length:    length,
 		}
 	}
 
@@ -208,12 +166,21 @@ func (o *Option) SetString(value string) error {
 		}
 	}
 
+	length := uint16(len(value))
+	if length < o.MinLen || length > o.MaxLen {
+		return OptionValueLengthError{
+			OptionDef: o.OptionDef,
+			Length:    length,
+		}
+	}
+
 	o.stringValue = value
 
 	return nil
 }
 
-func (o Option) Append(data []byte, prev uint16) ([]byte, error) {
+// Encode appends the encoded option to the provided data slice.
+func (o Option) Encode(data []byte, prev uint16) ([]byte, error) {
 	// determine value length
 	length := uint16(0)
 	switch o.ValueFormat {
@@ -225,50 +192,19 @@ func (o Option) Append(data []byte, prev uint16) ([]byte, error) {
 		length = uint16(len(o.stringValue))
 	}
 
-	// check length against option definition
-	if length < uint16(o.MinLen) || length > uint16(o.MaxLen) {
-		return nil, OptionValueLengthError{
-			OptionDef: o.OptionDef,
-			Length:    length,
-		}
-	}
-
 	// reserve space for delta/length header
-	i := len(data)
+	header := len(data)
 	data = append(data, 0)
 
 	// encode delta
-	header := uint8(0)
 	delta := uint16(o.Code - prev)
-	switch {
-	case delta <= 12:
-		header = uint8(delta << 4)
-	// 1 byte extra delta
-	case delta <= 269:
-		header = 13 << 4
-		data = append(data, uint8(delta-13))
-	// 2 byte extra delta
-	default:
-		header = 14 << 4
-		data = binary.BigEndian.AppendUint16(data, delta-269)
-	}
+	hd, data := encodeExtend(data, delta)
 
 	// encode length
-	switch {
-	case length < 12:
-		header = header | uint8(length)
-	// 1 byte extra length
-	case length <= 269:
-		header = header | 13
-		data = append(data, uint8(length-13))
-	// 2 byte extra length
-	default:
-		header = header | 14
-		data = binary.BigEndian.AppendUint16(data, length-269)
-	}
+	hl, data := encodeExtend(data, length)
 
 	// set delta/length header
-	data[i] = header
+	data[header] = hd<<4 | hl
 
 	if length == 0 {
 		return data, nil
@@ -280,10 +216,7 @@ func (o Option) Append(data []byte, prev uint16) ([]byte, error) {
 	case ValueFormatString:
 		data = append(data, o.stringValue...)
 	case ValueFormatUint:
-		// truncate zero bytes
-		b := [4]byte{}
-		binary.BigEndian.PutUint32(b[:], o.uintValue)
-		data = append(data, b[4-length:]...)
+		data = encode32(o.uintValue, data)
 	}
 
 	return data, nil
@@ -291,7 +224,7 @@ func (o Option) Append(data []byte, prev uint16) ([]byte, error) {
 
 func (o *Option) Decode(data []byte, prev uint16, schema *Schema) error {
 	if schema == nil {
-		schema = DefaultSchema
+		panic("schema must not be nil")
 	}
 
 	if len(data) == 0 {
@@ -321,14 +254,14 @@ func (o *Option) Decode(data []byte, prev uint16, schema *Schema) error {
 
 	// check length against option definition
 	switch {
+	case len(data) < offset+int(length):
+		return TruncatedError{
+			Expected: offset + int(length),
+		}
 	case length < o.MinLen || length > o.MaxLen:
 		return OptionValueLengthError{
 			OptionDef: o.OptionDef,
 			Length:    length,
-		}
-	case len(data) < offset+int(length):
-		return TruncatedError{
-			Expected: offset + int(length),
 		}
 	case length == 0:
 		return nil
@@ -342,10 +275,7 @@ func (o *Option) Decode(data []byte, prev uint16, schema *Schema) error {
 	case ValueFormatString:
 		o.stringValue = string(data)
 	case ValueFormatUint:
-		// truncate zero bytes
-		b := [4]byte{}
-		copy(b[4-length:], data)
-		o.uintValue = binary.BigEndian.Uint32(b[:])
+		o.uintValue = decode32(data)
 	}
 
 	return nil
@@ -368,21 +298,64 @@ func len32(v uint32) uint16 {
 	}
 }
 
+func encodeExtend(data []byte, v uint16) (uint8, []byte) {
+	switch {
+	case v < ExtendByteOffset:
+		return uint8(v), data
+	case v < ExtendDwordOffset:
+		data = append(data, uint8(v-ExtendByteOffset))
+		return ExtendByte, data
+	default:
+		data = binary.BigEndian.AppendUint16(data, v-ExtendDwordOffset)
+		return ExtendDword, data
+	}
+}
+
 func decodeExtend(data []byte, v uint8, offset int) (uint16, int, error) {
 	switch v {
-	case 13:
+	case ExtendByte:
 		if len(data) < offset+1 {
 			return 0, offset, TruncatedError{Expected: offset + 1}
 		}
-		return uint16(data[offset]) + 13, offset + 1, nil
-	case 14:
+		return uint16(data[offset]) + ExtendByteOffset, offset + 1, nil
+	case ExtendDword:
 		if len(data) < offset+2 {
 			return 0, offset, TruncatedError{Expected: offset + 2}
 		}
-		return binary.BigEndian.Uint16(data[offset:offset+2]) + 269, offset + 2, nil
-	case 15:
+		return binary.BigEndian.Uint16(data[offset:offset+2]) + ExtendDwordOffset, offset + 2, nil
+	case ExtendInvalid:
 		return 0, offset, UnsupportedExtendError{}
 	default:
 		return uint16(v), offset, nil
+	}
+}
+
+// encode32 encodes a uint32 value in big-endian format using the minimum number of bytes
+func encode32(v uint32, data []byte) []byte {
+	switch {
+	case v <= 0xFF:
+		return append(data, uint8(v))
+	case v <= 0xFFFF:
+		return append(data, uint8(v>>8), uint8(v))
+	case v <= 0xFFFFFF:
+		return append(data, uint8(v>>16), uint8(v>>8), uint8(v))
+	default:
+		return append(data, uint8(v>>24), uint8(v>>16), uint8(v>>8), uint8(v))
+	}
+}
+
+// decode32 decodes a uint32 value from big-endian format using the minimum number of bytes
+func decode32(data []byte) uint32 {
+	switch len(data) {
+	case 1:
+		return uint32(data[0])
+	case 2:
+		return uint32(data[0])<<8 | uint32(data[1])
+	case 3:
+		return uint32(data[0])<<16 | uint32(data[1])<<8 | uint32(data[2])
+	case 4:
+		return uint32(data[0])<<24 | uint32(data[1])<<16 | uint32(data[2])<<8 | uint32(data[3])
+	default:
+		panic("invalid data length for decode32")
 	}
 }

@@ -11,11 +11,11 @@ const (
 )
 
 type Header struct {
-	Version     uint8
-	Type        MessageType
-	Code        uint8
-	TokenLength uint8
-	MessageID   uint16
+	Version   uint8
+	Type      MessageType
+	Code      uint8
+	MessageID uint16
+	Token     []byte
 }
 
 type MessageType uint8
@@ -35,16 +35,18 @@ func (h Header) AppendBinary(data []byte) ([]byte, error) {
 		}
 	}
 
-	if h.TokenLength > TokenMaxLength {
+	tkl := len(h.Token)
+	if tkl > TokenMaxLength {
 		return data, InvalidTokenLength{
-			Length: h.TokenLength,
+			Length: tkl,
 		}
 	}
 
-	b := uint8(h.Version<<6) | uint8(h.Type<<4) | h.TokenLength
+	b := uint8(h.Version<<6) | uint8(h.Type<<4) | uint8(tkl)
 	data = append(data, b)
 	data = append(data, h.Code)
 	data = binary.BigEndian.AppendUint16(data, h.MessageID)
+	data = append(data, h.Token...)
 
 	return data, nil
 }
@@ -59,7 +61,7 @@ func (h *Header) UnmarshalBinary(data []byte) error {
 
 	b := data[0]
 	version := b >> 6
-	tpe := (b & 0xcf) >> 4
+	tpe := (b & 0x30) >> 4
 	tkl := b & 0x0f
 
 	if version != ProtocolVersion {
@@ -70,15 +72,21 @@ func (h *Header) UnmarshalBinary(data []byte) error {
 
 	if tkl > TokenMaxLength {
 		return InvalidTokenLength{
-			Length: tkl,
+			Length: int(tkl),
+		}
+	}
+
+	if len(data) < HeaderMinLength+int(tkl) {
+		return TruncatedError{
+			Expected: HeaderMinLength + int(tkl),
 		}
 	}
 
 	h.Version = version
 	h.Type = MessageType(tpe)
-	h.TokenLength = tkl
 	h.Code = data[1]
 	h.MessageID = binary.BigEndian.Uint16(data[2:4])
+	h.Token = data[4 : 4+int(tkl)]
 
 	return nil
 }
