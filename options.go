@@ -1,6 +1,7 @@
 package coap
 
 import (
+	"cmp"
 	"fmt"
 	"iter"
 	"slices"
@@ -10,39 +11,36 @@ type Options struct {
 	data []Option
 }
 
-type OptionNotFound struct {
-	OptionDef
-}
-
-func (e OptionNotFound) Error() string {
-	return fmt.Sprintf("option %q not found", e.Name)
-}
-
-func (o Options) GetFirst(def OptionDef) (*Option, error) {
-	i := slices.IndexFunc(o.data, func(v Option) bool {
-		return v.Code == def.Code
+func MakeOptions(data ...Option) Options {
+	slices.SortFunc(data, func(a, b Option) int {
+		return cmp.Compare(a.Code, b.Code)
 	})
-	if i == -1 {
-		return nil, OptionNotFound{
+
+	return Options{
+		data: data,
+	}
+}
+
+func (o Options) GetFirst(def OptionDef) (Option, error) {
+	i, ok := o.index(def)
+	if !ok {
+		return Option{}, OptionNotFound{
 			OptionDef: def,
 		}
 	}
 
-	return &o.data[i], nil
+	return o.data[i], nil
 }
 
 func (o Options) Has(def OptionDef) bool {
-	return slices.ContainsFunc(o.data, func(v Option) bool {
-		return v.Code == def.Code
-	})
+	_, ok := o.index(def)
+	return ok
 }
 
 func (o Options) Get(def OptionDef) iter.Seq[Option] {
 	return func(yield func(Option) bool) {
-		i := slices.IndexFunc(o.data, func(v Option) bool {
-			return v.Code == def.Code
-		})
-		if i == -1 {
+		i, ok := o.index(def)
+		if !ok {
 			return
 		}
 
@@ -59,9 +57,7 @@ func (o Options) Get(def OptionDef) iter.Seq[Option] {
 }
 
 func (o *Options) AddOption(opt Option) {
-	i := slices.IndexFunc(o.data, func(v Option) bool {
-		return v.Code >= opt.Code
-	})
+	i, _ := o.index(opt.OptionDef)
 	switch {
 	case i == -1:
 		o.data = append(o.data, opt)
@@ -70,15 +66,34 @@ func (o *Options) AddOption(opt Option) {
 	}
 }
 
-func (o *Options) ClearOption(opt Option) {
-	o.data = slices.DeleteFunc(o.data, func(v Option) bool {
-		return v.Code == opt.Code
+func (o *Options) ClearOption(def OptionDef) {
+	o.data = slices.DeleteFunc(o.data, func(opt Option) bool {
+		return opt.Code == def.Code
 	})
 }
 
 func (o *Options) SetOption(opt Option) {
-	o.ClearOption(opt)
-	o.AddOption(opt)
+	i, ok := o.index(opt.OptionDef)
+	switch {
+	// append option
+	case i == -1:
+		o.data = append(o.data, opt)
+		return
+	// insert option
+	case !ok:
+		o.data = slices.Insert(o.data, i, opt)
+		return
+	}
+
+	o.data[i] = opt
+
+	// delete all further instances of the same option
+	if opt.Repeatable {
+		count := slices.IndexFunc(o.data[i+1:], func(v Option) bool {
+			return v.Code != opt.Code
+		})
+		o.data = slices.Delete(o.data, i+1, i+count)
+	}
 }
 
 func (o *Options) ClearOptions() {
@@ -118,7 +133,7 @@ func (o Options) GetBytes(def OptionDef) ([]byte, error) {
 	return opt.GetBytes()
 }
 
-func (o Options) SetBytes(def OptionDef, value []byte) error {
+func (o *Options) SetBytes(def OptionDef, value []byte) error {
 	opt := Option{
 		OptionDef: def,
 	}
@@ -142,7 +157,7 @@ func (o Options) GetString(def OptionDef) (string, error) {
 	return opt.GetString()
 }
 
-func (o Options) SetString(def OptionDef, value string) error {
+func (o *Options) SetString(def OptionDef, value string) error {
 	opt := Option{
 		OptionDef: def,
 	}
@@ -171,4 +186,84 @@ func (o *Options) SetObserve(value uint32) {
 		OptionDef: Observe,
 		uintValue: value,
 	})
+}
+
+func (o Options) GetURIHost() (string, error) {
+	opt, err := o.GetFirst(UriHost)
+	if err != nil {
+		return "", err
+	}
+
+	return opt.GetString()
+}
+
+func (o *Options) SetURIHost(host string) error {
+	o.SetOption(Option{
+		OptionDef:   UriHost,
+		stringValue: host,
+	})
+
+	return nil
+}
+
+// AppendBinary implements encoding.BinaryAppender
+func (o Options) AppendBinary(data []byte) ([]byte, error) {
+	if len(o.data) == 0 {
+		return data, nil // no options to encode
+	}
+
+	prev := uint16(0)
+	for _, opt := range o.data {
+		var err error
+		data, err = opt.Encode(data, prev)
+		if err != nil {
+			return data, fmt.Errorf("encode option %q: %w", opt.OptionDef.Name, err)
+		}
+
+		prev = opt.Code
+	}
+
+	return data, nil
+}
+
+func (o *Options) Decode(data []byte, schema *Schema) ([]byte, error) {
+	if schema == nil {
+		panic("schema must not be nil")
+	}
+
+	prev := uint16(0)
+	options := []Option{}
+	for {
+		switch {
+		// end of message
+		case len(data) == 0:
+			o.data = options
+			return data, nil
+		// end of options marker
+		case data[0] == PayloadMarker:
+			o.data = options
+			return data[1:], nil
+		}
+
+		option := Option{}
+
+		var err error
+		data, err = option.Decode(data, prev, schema)
+		if err != nil {
+			return data, err
+		}
+
+		options = append(options, option)
+
+		prev = option.Code
+	}
+}
+
+func (o *Options) index(def OptionDef) (int, bool) {
+	i := slices.IndexFunc(o.data, func(opt Option) bool {
+		return opt.Code >= def.Code
+	})
+	ok := i != -1 && o.data[i].Code == def.Code
+
+	return i, ok
 }

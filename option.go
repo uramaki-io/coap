@@ -2,6 +2,7 @@ package coap
 
 import (
 	"encoding/binary"
+	"fmt"
 )
 
 const (
@@ -13,20 +14,21 @@ const (
 	ExtendDwordOffset = uint16(256) + uint16(ExtendByte) // 269
 )
 
-type OptionDef struct {
-	Name        string
-	Code        uint16
-	ValueFormat ValueFormat
-	MinLen      uint16
-	MaxLen      uint16
-}
-
 type Option struct {
 	OptionDef
 
 	uintValue   uint32
 	bytesValue  []byte
 	stringValue string
+}
+
+type OptionDef struct {
+	Name        string
+	Code        uint16
+	ValueFormat ValueFormat
+	Repeatable  bool
+	MinLen      uint16
+	MaxLen      uint16
 }
 
 type ValueFormat uint8
@@ -53,24 +55,77 @@ func (f ValueFormat) String() string {
 	}
 }
 
-// Critical returns true if option critical bit is set.
-func (o OptionDef) Critical() bool {
-	return o.Code&0x01 == 0x01
+func MustStringOption(def OptionDef, value string) Option {
+	opt, err := StringOption(def, value)
+	if err != nil {
+		panic(err)
+	}
+
+	return opt
 }
 
-func (o OptionDef) Unsafe() bool {
-	return o.Code&0x02 == 0x02
+func StringOption(def OptionDef, value string) (Option, error) {
+	opt := Option{
+		OptionDef: def,
+	}
+
+	err := opt.SetString(value)
+	if err != nil {
+		return Option{}, err
+	}
+
+	return opt, nil
 }
 
-func (o OptionDef) NoCacheKey() bool {
-	return o.Code&0x1E == 0x1c
+func OpaqueOption(def OptionDef, value []byte) (Option, error) {
+	opt := Option{
+		OptionDef: def,
+	}
+
+	err := opt.SetBytes(value)
+	if err != nil {
+		return Option{}, err
+	}
+
+	return opt, nil
 }
 
-func (o OptionDef) String() string {
-	return o.Name
+func MustOpaqueOption(def OptionDef, value []byte) Option {
+	opt, err := OpaqueOption(def, value)
+	if err != nil {
+		panic(err)
+	}
+
+	return opt
 }
 
-func (o Option) Value() any {
+func UintOption(def OptionDef, value uint32) (Option, error) {
+	opt := Option{
+		OptionDef: def,
+	}
+
+	err := opt.SetUint(value)
+	if err != nil {
+		return Option{}, err
+	}
+
+	return opt, nil
+}
+
+func MustUintOption(def OptionDef, value uint32) Option {
+	opt, err := UintOption(def, value)
+	if err != nil {
+		panic(err)
+	}
+
+	return opt
+}
+
+func (o Option) String() string {
+	return fmt.Sprintf("Option(%s, %q)", o.Name, o.GetValue())
+}
+
+func (o Option) GetValue() any {
 	switch o.ValueFormat {
 	case ValueFormatUint:
 		return o.uintValue
@@ -80,6 +135,19 @@ func (o Option) Value() any {
 		return o.stringValue
 	default:
 		return nil
+	}
+}
+
+func (o *Option) SetValue(value any) error {
+	switch v := value.(type) {
+	case uint32:
+		return o.SetUint(v)
+	case []byte:
+		return o.SetBytes(v)
+	case string:
+		return o.SetString(v)
+	default:
+		return fmt.Errorf("unsupported value type %T for option %q", value, o.Name)
 	}
 }
 
@@ -102,7 +170,7 @@ func (o *Option) SetUint(value uint32) error {
 		}
 	}
 
-	length := len32(value)
+	length := Len32(value)
 	if length < o.MinLen || length > o.MaxLen {
 		return OptionValueLengthError{
 			OptionDef: o.OptionDef,
@@ -185,7 +253,7 @@ func (o Option) Encode(data []byte, prev uint16) ([]byte, error) {
 	length := uint16(0)
 	switch o.ValueFormat {
 	case ValueFormatUint:
-		length = len32(o.uintValue)
+		length = Len32(o.uintValue)
 	case ValueFormatOpaque:
 		length = uint16(len(o.bytesValue))
 	case ValueFormatString:
@@ -216,72 +284,92 @@ func (o Option) Encode(data []byte, prev uint16) ([]byte, error) {
 	case ValueFormatString:
 		data = append(data, o.stringValue...)
 	case ValueFormatUint:
-		data = encode32(o.uintValue, data)
+		data = Encode32(o.uintValue, data)
 	}
 
 	return data, nil
 }
 
-func (o *Option) Decode(data []byte, prev uint16, schema *Schema) error {
+func (o *Option) Decode(data []byte, prev uint16, schema *Schema) ([]byte, error) {
 	if schema == nil {
 		panic("schema must not be nil")
 	}
 
 	if len(data) == 0 {
-		return TruncatedError{
+		return data, TruncatedError{
 			Expected: 1,
 		}
 	}
 
 	header := data[0]
-	offset := 1
+	data = data[1:]
 
 	// decode delta
-	delta, offset, err := decodeExtend(data, header>>4, offset)
+	var delta uint16
+	var err error
+	delta, data, err = decodeExtend(data, header>>4)
 	if err != nil {
-		return err
+		return data, err
 	}
 
 	// decode length
-	length, offset, err := decodeExtend(data, header&0x0F, offset)
+	var length uint16
+	length, data, err = decodeExtend(data, header&0x0F)
 	if err != nil {
-		return err
+		return data, err
 	}
 
 	// lookup option definition
 	code := prev + delta
-	o.OptionDef = schema.OptionDef(code)
+	o.OptionDef = schema.Option(code)
 
 	// check length against option definition
 	switch {
-	case len(data) < offset+int(length):
-		return TruncatedError{
-			Expected: offset + int(length),
+	case len(data) < int(length):
+		return data, TruncatedError{
+			Expected: int(length),
 		}
 	case length < o.MinLen || length > o.MaxLen:
-		return OptionValueLengthError{
+		return data, OptionValueLengthError{
 			OptionDef: o.OptionDef,
 			Length:    length,
 		}
 	case length == 0:
-		return nil
+		return data, nil
 	}
 
 	// decode value
-	data = data[offset : offset+int(length)]
 	switch o.ValueFormat {
 	case ValueFormatOpaque:
-		o.bytesValue = data
+		o.bytesValue = data[:length]
 	case ValueFormatString:
-		o.stringValue = string(data)
+		o.stringValue = string(data[:length])
 	case ValueFormatUint:
-		o.uintValue = decode32(data)
+		o.uintValue = Decode32(data[:length])
 	}
 
-	return nil
+	return data[length:], nil
 }
 
-func len32(v uint32) uint16 {
+// Critical returns true if option critical bit is set.
+func (o OptionDef) Critical() bool {
+	return o.Code&0x01 == 0x01
+}
+
+func (o OptionDef) Unsafe() bool {
+	return o.Code&0x02 == 0x02
+}
+
+func (o OptionDef) NoCacheKey() bool {
+	return o.Code&0x1E == 0x1c
+}
+
+func (o OptionDef) String() string {
+	return o.Name
+}
+
+// Len32 returns minimum number of bytes required to encode a uint32 value in big-endian format
+func Len32(v uint32) uint16 {
 	if v == 0 {
 		return 0
 	}
@@ -298,6 +386,36 @@ func len32(v uint32) uint16 {
 	}
 }
 
+// Encode32 encodes a uint32 value in big-endian format using the minimum number of bytes
+func Encode32(v uint32, data []byte) []byte {
+	switch {
+	case v <= 0xFF:
+		return append(data, uint8(v))
+	case v <= 0xFFFF:
+		return append(data, uint8(v>>8), uint8(v))
+	case v <= 0xFFFFFF:
+		return append(data, uint8(v>>16), uint8(v>>8), uint8(v))
+	default:
+		return append(data, uint8(v>>24), uint8(v>>16), uint8(v>>8), uint8(v))
+	}
+}
+
+// Decode32 decodes a uint32 value from big-endian format using the minimum number of bytes
+func Decode32(data []byte) uint32 {
+	switch len(data) {
+	case 1:
+		return uint32(data[0])
+	case 2:
+		return uint32(data[0])<<8 | uint32(data[1])
+	case 3:
+		return uint32(data[0])<<16 | uint32(data[1])<<8 | uint32(data[2])
+	case 4:
+		return uint32(data[0])<<24 | uint32(data[1])<<16 | uint32(data[2])<<8 | uint32(data[3])
+	default:
+		panic("invalid data length for decode32")
+	}
+}
+
 func encodeExtend(data []byte, v uint16) (uint8, []byte) {
 	switch {
 	case v < ExtendByteOffset:
@@ -311,51 +429,25 @@ func encodeExtend(data []byte, v uint16) (uint8, []byte) {
 	}
 }
 
-func decodeExtend(data []byte, v uint8, offset int) (uint16, int, error) {
+func decodeExtend(data []byte, v uint8) (uint16, []byte, error) {
 	switch v {
 	case ExtendByte:
-		if len(data) < offset+1 {
-			return 0, offset, TruncatedError{Expected: offset + 1}
+		if len(data) < 1 {
+			return 0, data, TruncatedError{
+				Expected: 1,
+			}
 		}
-		return uint16(data[offset]) + ExtendByteOffset, offset + 1, nil
+		return uint16(data[0]) + ExtendByteOffset, data[1:], nil
 	case ExtendDword:
-		if len(data) < offset+2 {
-			return 0, offset, TruncatedError{Expected: offset + 2}
+		if len(data) < 2 {
+			return 0, data, TruncatedError{
+				Expected: 2,
+			}
 		}
-		return binary.BigEndian.Uint16(data[offset:offset+2]) + ExtendDwordOffset, offset + 2, nil
+		return binary.BigEndian.Uint16(data) + ExtendDwordOffset, data[2:], nil
 	case ExtendInvalid:
-		return 0, offset, UnsupportedExtendError{}
+		return 0, data, UnsupportedExtendError{}
 	default:
-		return uint16(v), offset, nil
-	}
-}
-
-// encode32 encodes a uint32 value in big-endian format using the minimum number of bytes
-func encode32(v uint32, data []byte) []byte {
-	switch {
-	case v <= 0xFF:
-		return append(data, uint8(v))
-	case v <= 0xFFFF:
-		return append(data, uint8(v>>8), uint8(v))
-	case v <= 0xFFFFFF:
-		return append(data, uint8(v>>16), uint8(v>>8), uint8(v))
-	default:
-		return append(data, uint8(v>>24), uint8(v>>16), uint8(v>>8), uint8(v))
-	}
-}
-
-// decode32 decodes a uint32 value from big-endian format using the minimum number of bytes
-func decode32(data []byte) uint32 {
-	switch len(data) {
-	case 1:
-		return uint32(data[0])
-	case 2:
-		return uint32(data[0])<<8 | uint32(data[1])
-	case 3:
-		return uint32(data[0])<<16 | uint32(data[1])<<8 | uint32(data[2])
-	case 4:
-		return uint32(data[0])<<24 | uint32(data[1])<<16 | uint32(data[2])<<8 | uint32(data[3])
-	default:
-		panic("invalid data length for decode32")
+		return uint16(v), data, nil
 	}
 }

@@ -14,17 +14,18 @@ func TestHeaderRoundtrip(t *testing.T) {
 	}{
 		{
 			name: "confirmable GET",
-			data: append([]byte{
-				0x48,       // Version 1, Confirmable, Token Length 8}
+			data: []byte{
+				0x44,       // Version 1, Confirmable, Token Length 4}
 				0x01,       // Code 1 (GET)
 				0x42, 0x42, // Message ID 0x4242
-			}, bytes8...),
+				0xde, 0xad, 0xbe, 0xef,
+			},
 			expected: Header{
 				Version:   ProtocolVersion,
 				Type:      Confirmable,
 				Code:      uint8(Get),
 				MessageID: 0x4242,
-				Token:     bytes8,
+				Token:     bytes4,
 			},
 		},
 	}
@@ -32,9 +33,13 @@ func TestHeaderRoundtrip(t *testing.T) {
 		header := Header{}
 
 		t.Run(test.name+"/unmarshal", func(t *testing.T) {
-			err := header.UnmarshalBinary(test.data)
+			data, err := header.Decode(test.data)
 			if err != nil {
 				t.Fatal("unmarshal:", err)
+			}
+
+			if len(data) != 0 {
+				t.Errorf("unexpected trailing data: %x", data)
 			}
 
 			diff := cmp.Diff(test.expected, header)

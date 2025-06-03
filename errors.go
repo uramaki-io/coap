@@ -20,6 +20,10 @@ type InvalidTokenLength struct {
 
 type UnsupportedExtendError struct{}
 
+type OptionNotFound struct {
+	OptionDef
+}
+
 type OptionValueLengthError struct {
 	OptionDef
 	Length uint16
@@ -52,6 +56,10 @@ func (e UnsupportedExtendError) Error() string {
 
 func (e TruncatedError) Error() string {
 	return fmt.Sprintf("truncated input, expected %d bytes", e.Expected)
+}
+
+func (e OptionNotFound) Error() string {
+	return fmt.Sprintf("option %q not found", e.Name)
 }
 
 func (e OptionValueLengthError) Error() string {

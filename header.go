@@ -7,7 +7,7 @@ import (
 const (
 	ProtocolVersion = 1
 	TokenMaxLength  = 8
-	HeaderMinLength = 4
+	HeaderLength    = 4
 )
 
 type Header struct {
@@ -27,7 +27,7 @@ const (
 	Reset
 )
 
-// AppendBinary implement encoding.BinaryAppender
+// AppendBinary implements encoding.BinaryAppender
 func (h Header) AppendBinary(data []byte) ([]byte, error) {
 	if h.Version != ProtocolVersion {
 		return data, UnsupportedVersion{
@@ -51,11 +51,10 @@ func (h Header) AppendBinary(data []byte) ([]byte, error) {
 	return data, nil
 }
 
-// UnmarshalBinary implements encoding.BinaryUnmarshaler
-func (h *Header) UnmarshalBinary(data []byte) error {
-	if len(data) < HeaderMinLength {
-		return TruncatedError{
-			Expected: HeaderMinLength,
+func (h *Header) Decode(data []byte) ([]byte, error) {
+	if len(data) < HeaderLength {
+		return data, TruncatedError{
+			Expected: HeaderLength,
 		}
 	}
 
@@ -65,20 +64,20 @@ func (h *Header) UnmarshalBinary(data []byte) error {
 	tkl := b & 0x0f
 
 	if version != ProtocolVersion {
-		return UnsupportedVersion{
+		return data, UnsupportedVersion{
 			Version: version,
 		}
 	}
 
 	if tkl > TokenMaxLength {
-		return InvalidTokenLength{
+		return data, InvalidTokenLength{
 			Length: int(tkl),
 		}
 	}
 
-	if len(data) < HeaderMinLength+int(tkl) {
-		return TruncatedError{
-			Expected: HeaderMinLength + int(tkl),
+	if len(data) < HeaderLength+int(tkl) {
+		return data, TruncatedError{
+			Expected: HeaderLength + int(tkl),
 		}
 	}
 
@@ -86,7 +85,7 @@ func (h *Header) UnmarshalBinary(data []byte) error {
 	h.Type = MessageType(tpe)
 	h.Code = data[1]
 	h.MessageID = binary.BigEndian.Uint16(data[2:4])
-	h.Token = data[4 : 4+int(tkl)]
+	h.Token = data[4 : 4+tkl]
 
-	return nil
+	return data[4+tkl:], nil
 }
