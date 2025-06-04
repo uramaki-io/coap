@@ -23,7 +23,7 @@ func TestHeaderRoundtrip(t *testing.T) {
 			expected: Header{
 				Version:   ProtocolVersion,
 				Type:      Confirmable,
-				Code:      uint8(Get),
+				Code:      Code(GET),
 				MessageID: 0x4242,
 				Token:     bytes4,
 			},

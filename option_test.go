@@ -29,10 +29,10 @@ func TestOptionSetBytes(t *testing.T) {
 		},
 		{
 			name:   "not an opaque value",
-			option: UriHost,
+			option: URIHost,
 			data:   bytes8,
-			err: OptionValueFormatError{
-				OptionDef: UriHost,
+			err: InvalidOptionValueFormat{
+				OptionDef: URIHost,
 				Requested: ValueFormatOpaque,
 			},
 		},
@@ -40,7 +40,7 @@ func TestOptionSetBytes(t *testing.T) {
 			name:   "opaque value too long",
 			option: IfMatch,
 			data:   bytes272,
-			err: OptionValueLengthError{
+			err: InvalidOptionValueLength{
 				OptionDef: IfMatch,
 				Length:    272,
 			},
@@ -48,7 +48,7 @@ func TestOptionSetBytes(t *testing.T) {
 		{
 			name:   "opaque value too short",
 			option: ETag,
-			err: OptionValueLengthError{
+			err: InvalidOptionValueLength{
 				OptionDef: ETag,
 				Length:    0,
 			},
@@ -61,7 +61,7 @@ func TestOptionSetBytes(t *testing.T) {
 				OptionDef: test.option,
 			}
 
-			err := opt.SetBytes(test.data)
+			err := opt.SetOpaque(test.data)
 			diff := cmp.Diff(test.err, err, cmpopts.EquateErrors())
 			if diff != "" {
 				t.Errorf("error mismatch (-want +got):\n%s", diff)
@@ -90,19 +90,19 @@ func TestOptionRoundtrip(t *testing.T) {
 		},
 		{
 			name:   "string value format",
-			option: UriHost,
+			option: URIHost,
 			data:   append([]byte{0x38}, bytes8...),
 			value:  string(bytes8),
 		},
 		{
 			name:   "uint value format/1",
-			option: UriPort,
+			option: URIPort,
 			data:   []byte{0x71, 0x42},
 			value:  uint32(0x42),
 		},
 		{
 			name:   "uint value format/2",
-			option: UriPort,
+			option: URIPort,
 			data:   []byte{0x72, 0x42, 0x42},
 			value:  uint32(0x4242),
 		},
@@ -133,13 +133,13 @@ func TestOptionRoundtrip(t *testing.T) {
 			value: []byte(nil),
 		},
 		{
-			option: ProxyUri,
+			option: ProxyURI,
 			name:   "length extend byte",
 			data:   append([]byte{0xDD, 0x16, 0x03}, bytes16...),
 			value:  string(bytes16),
 		},
 		{
-			option: ProxyUri,
+			option: ProxyURI,
 			name:   "length extend dword",
 			data:   append([]byte{0xDE, 0x16, 0x00, 0x03}, bytes272...),
 			value:  string(bytes272),
@@ -237,8 +237,8 @@ func TestOptionDecodeError(t *testing.T) {
 		{
 			name:  "value length",
 			input: []byte{0x73, 0x01, 0x02, 0x03},
-			err: OptionValueLengthError{
-				OptionDef: UriPort,
+			err: InvalidOptionValueLength{
+				OptionDef: URIPort,
 				Length:    3,
 			},
 		},

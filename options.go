@@ -21,25 +21,23 @@ func MakeOptions(data ...Option) Options {
 	}
 }
 
-func (o Options) GetFirst(def OptionDef) (Option, error) {
-	i, ok := o.index(def)
+func (o Options) Get(def OptionDef) (Option, bool) {
+	i, ok := o.index(def.Code)
 	if !ok {
-		return Option{}, OptionNotFound{
-			OptionDef: def,
-		}
+		return Option{}, false
 	}
 
-	return o.data[i], nil
+	return o.data[i], true
 }
 
 func (o Options) Has(def OptionDef) bool {
-	_, ok := o.index(def)
+	_, ok := o.index(def.Code)
 	return ok
 }
 
-func (o Options) Get(def OptionDef) iter.Seq[Option] {
+func (o Options) Seq(def OptionDef) iter.Seq[Option] {
 	return func(yield func(Option) bool) {
-		i, ok := o.index(def)
+		i, ok := o.index(def.Code)
 		if !ok {
 			return
 		}
@@ -56,44 +54,14 @@ func (o Options) Get(def OptionDef) iter.Seq[Option] {
 	}
 }
 
-func (o *Options) AddOption(opt Option) {
-	i, _ := o.index(opt.OptionDef)
-	switch {
-	case i == -1:
-		o.data = append(o.data, opt)
-	default:
-		o.data = slices.Insert(o.data, i, opt)
-	}
-}
-
 func (o *Options) ClearOption(def OptionDef) {
-	o.data = slices.DeleteFunc(o.data, func(opt Option) bool {
-		return opt.Code == def.Code
-	})
+	o.reset(def.Code, 0)
 }
 
 func (o *Options) SetOption(opt Option) {
-	i, ok := o.index(opt.OptionDef)
-	switch {
-	// append option
-	case i == -1:
-		o.data = append(o.data, opt)
-		return
-	// insert option
-	case !ok:
-		o.data = slices.Insert(o.data, i, opt)
-		return
-	}
+	i := o.reset(opt.Code, 1)
 
 	o.data[i] = opt
-
-	// delete all further instances of the same option
-	if opt.Repeatable {
-		count := slices.IndexFunc(o.data[i+1:], func(v Option) bool {
-			return v.Code != opt.Code
-		})
-		o.data = slices.Delete(o.data, i+1, i+count)
-	}
 }
 
 func (o *Options) ClearOptions() {
@@ -101,9 +69,11 @@ func (o *Options) ClearOptions() {
 }
 
 func (o Options) GetUint(def OptionDef) (uint32, error) {
-	opt, err := o.GetFirst(def)
-	if err != nil {
-		return 0, err
+	opt, ok := o.Get(def)
+	if !ok {
+		return 0, OptionNotFound{
+			OptionDef: def,
+		}
 	}
 
 	return opt.GetUint()
@@ -124,21 +94,23 @@ func (o *Options) SetUint(def OptionDef, value uint32) error {
 	return nil
 }
 
-func (o Options) GetBytes(def OptionDef) ([]byte, error) {
-	opt, err := o.GetFirst(def)
-	if err != nil {
-		return nil, err
+func (o Options) GetOpaque(def OptionDef) ([]byte, error) {
+	opt, ok := o.Get(def)
+	if !ok {
+		return nil, OptionNotFound{
+			OptionDef: def,
+		}
 	}
 
-	return opt.GetBytes()
+	return opt.GetOpaque()
 }
 
-func (o *Options) SetBytes(def OptionDef, value []byte) error {
+func (o *Options) SetOpaque(def OptionDef, value []byte) error {
 	opt := Option{
 		OptionDef: def,
 	}
 
-	err := opt.SetBytes(value)
+	err := opt.SetOpaque(value)
 	if err != nil {
 		return err
 	}
@@ -149,9 +121,11 @@ func (o *Options) SetBytes(def OptionDef, value []byte) error {
 }
 
 func (o Options) GetString(def OptionDef) (string, error) {
-	opt, err := o.GetFirst(def)
-	if err != nil {
-		return "", err
+	opt, ok := o.Get(def)
+	if !ok {
+		return "", OptionNotFound{
+			OptionDef: def,
+		}
 	}
 
 	return opt.GetString()
@@ -172,36 +146,116 @@ func (o *Options) SetString(def OptionDef, value string) error {
 	return nil
 }
 
-func (o *Options) GetObserve() (uint32, error) {
-	option, err := o.GetFirst(Observe)
-	if err != nil {
-		return 0, err
+func (o Options) UintSeq(def OptionDef) (iter.Seq[uint32], error) {
+	if def.ValueFormat != ValueFormatUint {
+		return nil, InvalidOptionValueFormat{
+			OptionDef: def,
+			Requested: ValueFormatUint,
+		}
 	}
 
-	return option.GetUint()
+	return func(yield func(uint32) bool) {
+		for opt := range o.Seq(def) {
+			if !yield(opt.uintValue) {
+				return
+			}
+		}
+	}, nil
 }
 
-func (o *Options) SetObserve(value uint32) {
-	o.SetOption(Option{
-		OptionDef: Observe,
-		uintValue: value,
-	})
-}
-
-func (o Options) GetURIHost() (string, error) {
-	opt, err := o.GetFirst(UriHost)
-	if err != nil {
-		return "", err
+func (o *Options) SetUintValues(def OptionDef, values ...uint32) error {
+	if def.ValueFormat != ValueFormatUint {
+		return InvalidOptionValueFormat{
+			OptionDef: def,
+			Requested: ValueFormatUint,
+		}
 	}
 
-	return opt.GetString()
+	i := o.reset(def.Code, len(values))
+	for j := range len(values) {
+		opt := Option{
+			OptionDef: def,
+		}
+
+		err := opt.SetUint(values[j])
+		if err != nil {
+			return err
+		}
+
+		o.data[i+j] = opt
+	}
+
+	return nil
 }
 
-func (o *Options) SetURIHost(host string) error {
-	o.SetOption(Option{
-		OptionDef:   UriHost,
-		stringValue: host,
-	})
+func (o Options) OpaqueSeq(def OptionDef) (iter.Seq[[]byte], error) {
+	if def.ValueFormat != ValueFormatOpaque {
+		return nil, InvalidOptionValueFormat{
+			OptionDef: def,
+			Requested: ValueFormatOpaque,
+		}
+	}
+
+	return func(yield func([]byte) bool) {
+		for opt := range o.Seq(def) {
+			if !yield(opt.opaqueValue) {
+				return
+			}
+		}
+	}, nil
+}
+
+func (o *Options) SetOpaqueValues(def OptionDef, values ...[]byte) error {
+	if def.ValueFormat != ValueFormatOpaque {
+		return InvalidOptionValueFormat{
+			OptionDef: def,
+			Requested: ValueFormatOpaque,
+		}
+	}
+
+	i := o.reset(def.Code, len(values))
+	for j := range len(values) {
+		o.data[i+j] = Option{
+			OptionDef:   def,
+			opaqueValue: values[j],
+		}
+	}
+
+	return nil
+}
+
+func (o Options) StringSeq(def OptionDef) (iter.Seq[string], error) {
+	if def.ValueFormat != ValueFormatString {
+		return nil, InvalidOptionValueFormat{
+			OptionDef: def,
+			Requested: ValueFormatString,
+		}
+	}
+
+	return func(yield func(string) bool) {
+		for opt := range o.Seq(def) {
+			if !yield(opt.stringValue) {
+				return
+			}
+		}
+	}, nil
+}
+
+func (o *Options) SetStringValues(def OptionDef, values ...string) error {
+	if def.ValueFormat != ValueFormatString {
+		return InvalidOptionValueFormat{
+			OptionDef: def,
+			Requested: ValueFormatString,
+		}
+	}
+
+	i := o.reset(def.Code, len(values))
+	for j := range len(values) {
+		o.data[i+j] = Option{
+			OptionDef:   def,
+			stringValue: values[j],
+		}
+	}
 
 	return nil
 }
@@ -233,21 +287,9 @@ func (o *Options) Decode(data []byte, schema *Schema) ([]byte, error) {
 
 	prev := uint16(0)
 	options := []Option{}
-	for {
-		switch {
-		// end of message
-		case len(data) == 0:
-			o.data = options
-			return data, nil
-		// end of options marker
-		case data[0] == PayloadMarker:
-			o.data = options
-			return data[1:], nil
-		}
-
-		option := Option{}
-
+	for len(data) > 0 && data[0] != PayloadMarker {
 		var err error
+		var option Option
 		data, err = option.Decode(data, prev, schema)
 		if err != nil {
 			return data, err
@@ -257,13 +299,42 @@ func (o *Options) Decode(data []byte, schema *Schema) ([]byte, error) {
 
 		prev = option.Code
 	}
+
+	o.data = options
+	return data, nil
 }
 
-func (o *Options) index(def OptionDef) (int, bool) {
+func (o *Options) reset(code uint16, length int) int {
+	if length == 0 {
+		return len(o.data)
+	}
+
+	i, ok := o.index(code)
+	switch {
+	// option found, trim if necessary
+	case ok:
+		count := slices.IndexFunc(o.data[i+1:], func(v Option) bool {
+			return v.Code != code
+		})
+
+		if count > length {
+			o.data = slices.Delete(o.data, i, i+count-length)
+			return i
+		}
+	case i == -1:
+		i = len(o.data)
+	}
+
+	o.data = slices.Insert(o.data, i, make([]Option, length)...)
+
+	return i
+}
+
+func (o Options) index(code uint16) (int, bool) {
 	i := slices.IndexFunc(o.data, func(opt Option) bool {
-		return opt.Code >= def.Code
+		return opt.Code >= code
 	})
-	ok := i != -1 && o.data[i].Code == def.Code
+	ok := i != -1 && o.data[i].Code == code
 
 	return i, ok
 }

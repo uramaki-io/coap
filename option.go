@@ -18,7 +18,7 @@ type Option struct {
 	OptionDef
 
 	uintValue   uint32
-	bytesValue  []byte
+	opaqueValue []byte
 	stringValue string
 }
 
@@ -55,74 +55,44 @@ func (f ValueFormat) String() string {
 	}
 }
 
-func MustStringOption(def OptionDef, value string) Option {
-	opt, err := StringOption(def, value)
+func Must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func MustValue[T any](value T, err error) T {
 	if err != nil {
 		panic(err)
 	}
 
-	return opt
+	return value
 }
 
-func StringOption(def OptionDef, value string) (Option, error) {
+func MakeOption(def OptionDef, value any) (Option, error) {
 	opt := Option{
 		OptionDef: def,
 	}
 
-	err := opt.SetString(value)
+	err := opt.SetValue(value)
 	if err != nil {
-		return Option{}, err
+		return Option{}, nil
 	}
 
 	return opt, nil
-}
-
-func OpaqueOption(def OptionDef, value []byte) (Option, error) {
-	opt := Option{
-		OptionDef: def,
-	}
-
-	err := opt.SetBytes(value)
-	if err != nil {
-		return Option{}, err
-	}
-
-	return opt, nil
-}
-
-func MustOpaqueOption(def OptionDef, value []byte) Option {
-	opt, err := OpaqueOption(def, value)
-	if err != nil {
-		panic(err)
-	}
-
-	return opt
-}
-
-func UintOption(def OptionDef, value uint32) (Option, error) {
-	opt := Option{
-		OptionDef: def,
-	}
-
-	err := opt.SetUint(value)
-	if err != nil {
-		return Option{}, err
-	}
-
-	return opt, nil
-}
-
-func MustUintOption(def OptionDef, value uint32) Option {
-	opt, err := UintOption(def, value)
-	if err != nil {
-		panic(err)
-	}
-
-	return opt
 }
 
 func (o Option) String() string {
-	return fmt.Sprintf("Option(%s, %q)", o.Name, o.GetValue())
+	switch o.ValueFormat {
+	case ValueFormatUint:
+		return fmt.Sprintf("Option(%s, %d)", o.Name, o.uintValue)
+	case ValueFormatOpaque:
+		return fmt.Sprintf("Option(%s, %x)", o.Name, o.opaqueValue)
+	case ValueFormatString:
+		return fmt.Sprintf("Option(%s, %q)", o.Name, o.stringValue)
+	default:
+		return fmt.Sprintf("Option(%s, <empty>)", o.Name)
+	}
 }
 
 func (o Option) GetValue() any {
@@ -130,7 +100,7 @@ func (o Option) GetValue() any {
 	case ValueFormatUint:
 		return o.uintValue
 	case ValueFormatOpaque:
-		return o.bytesValue
+		return o.opaqueValue
 	case ValueFormatString:
 		return o.stringValue
 	default:
@@ -143,7 +113,7 @@ func (o *Option) SetValue(value any) error {
 	case uint32:
 		return o.SetUint(v)
 	case []byte:
-		return o.SetBytes(v)
+		return o.SetOpaque(v)
 	case string:
 		return o.SetString(v)
 	default:
@@ -153,7 +123,7 @@ func (o *Option) SetValue(value any) error {
 
 func (o Option) GetUint() (uint32, error) {
 	if o.ValueFormat != ValueFormatUint {
-		return 0, OptionValueFormatError{
+		return 0, InvalidOptionValueFormat{
 			OptionDef: o.OptionDef,
 			Requested: ValueFormatUint,
 		}
@@ -164,7 +134,7 @@ func (o Option) GetUint() (uint32, error) {
 
 func (o *Option) SetUint(value uint32) error {
 	if o.ValueFormat != ValueFormatUint {
-		return OptionValueFormatError{
+		return InvalidOptionValueFormat{
 			OptionDef: o.OptionDef,
 			Requested: ValueFormatUint,
 		}
@@ -172,7 +142,7 @@ func (o *Option) SetUint(value uint32) error {
 
 	length := Len32(value)
 	if length < o.MinLen || length > o.MaxLen {
-		return OptionValueLengthError{
+		return InvalidOptionValueLength{
 			OptionDef: o.OptionDef,
 			Length:    length,
 		}
@@ -183,20 +153,20 @@ func (o *Option) SetUint(value uint32) error {
 	return nil
 }
 
-func (o Option) GetBytes() ([]byte, error) {
+func (o Option) GetOpaque() ([]byte, error) {
 	if o.ValueFormat != ValueFormatOpaque {
-		return nil, OptionValueFormatError{
+		return nil, InvalidOptionValueFormat{
 			OptionDef: o.OptionDef,
 			Requested: ValueFormatOpaque,
 		}
 	}
 
-	return o.bytesValue, nil
+	return o.opaqueValue, nil
 }
 
-func (o *Option) SetBytes(value []byte) error {
+func (o *Option) SetOpaque(value []byte) error {
 	if o.ValueFormat != ValueFormatOpaque {
-		return OptionValueFormatError{
+		return InvalidOptionValueFormat{
 			OptionDef: o.OptionDef,
 			Requested: ValueFormatOpaque,
 		}
@@ -204,20 +174,20 @@ func (o *Option) SetBytes(value []byte) error {
 
 	length := uint16(len(value))
 	if length < o.MinLen || length > o.MaxLen {
-		return OptionValueLengthError{
+		return InvalidOptionValueLength{
 			OptionDef: o.OptionDef,
 			Length:    length,
 		}
 	}
 
-	o.bytesValue = value
+	o.opaqueValue = value
 
 	return nil
 }
 
 func (o Option) GetString() (string, error) {
 	if o.ValueFormat != ValueFormatString {
-		return "", OptionValueFormatError{
+		return "", InvalidOptionValueFormat{
 			OptionDef: o.OptionDef,
 			Requested: ValueFormatString,
 		}
@@ -228,7 +198,7 @@ func (o Option) GetString() (string, error) {
 
 func (o *Option) SetString(value string) error {
 	if o.ValueFormat != ValueFormatString {
-		return OptionValueFormatError{
+		return InvalidOptionValueFormat{
 			OptionDef: o.OptionDef,
 			Requested: ValueFormatString,
 		}
@@ -236,7 +206,7 @@ func (o *Option) SetString(value string) error {
 
 	length := uint16(len(value))
 	if length < o.MinLen || length > o.MaxLen {
-		return OptionValueLengthError{
+		return InvalidOptionValueLength{
 			OptionDef: o.OptionDef,
 			Length:    length,
 		}
@@ -255,7 +225,7 @@ func (o Option) Encode(data []byte, prev uint16) ([]byte, error) {
 	case ValueFormatUint:
 		length = Len32(o.uintValue)
 	case ValueFormatOpaque:
-		length = uint16(len(o.bytesValue))
+		length = uint16(len(o.opaqueValue))
 	case ValueFormatString:
 		length = uint16(len(o.stringValue))
 	}
@@ -280,7 +250,7 @@ func (o Option) Encode(data []byte, prev uint16) ([]byte, error) {
 
 	switch o.ValueFormat {
 	case ValueFormatOpaque:
-		data = append(data, o.bytesValue...)
+		data = append(data, o.opaqueValue...)
 	case ValueFormatString:
 		data = append(data, o.stringValue...)
 	case ValueFormatUint:
@@ -327,10 +297,10 @@ func (o *Option) Decode(data []byte, prev uint16, schema *Schema) ([]byte, error
 	switch {
 	case len(data) < int(length):
 		return data, TruncatedError{
-			Expected: int(length),
+			Expected: uint(length),
 		}
 	case length < o.MinLen || length > o.MaxLen:
-		return data, OptionValueLengthError{
+		return data, InvalidOptionValueLength{
 			OptionDef: o.OptionDef,
 			Length:    length,
 		}
@@ -341,7 +311,7 @@ func (o *Option) Decode(data []byte, prev uint16, schema *Schema) ([]byte, error
 	// decode value
 	switch o.ValueFormat {
 	case ValueFormatOpaque:
-		o.bytesValue = data[:length]
+		o.opaqueValue = data[:length]
 	case ValueFormatString:
 		o.stringValue = string(data[:length])
 	case ValueFormatUint:

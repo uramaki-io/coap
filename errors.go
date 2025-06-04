@@ -2,20 +2,29 @@ package coap
 
 import "fmt"
 
+type UnsupportedVersion struct {
+	Version uint8
+}
+
+type UnsupportedType struct {
+	Type Type
+}
+
+type UnsupportedCode struct {
+	Code Code
+}
+
+type UnsupportedTokenLength struct {
+	Length uint
+}
+
 type ParseError struct {
-	Offset int
+	Offset uint
 	Cause  error
 }
 
 type TruncatedError struct {
-	Expected int
-}
-
-type UnsupportedVersion struct {
-	Version uint8
-}
-type InvalidTokenLength struct {
-	Length int
+	Expected uint
 }
 
 type UnsupportedExtendError struct{}
@@ -24,14 +33,14 @@ type OptionNotFound struct {
 	OptionDef
 }
 
-type OptionValueLengthError struct {
-	OptionDef
-	Length uint16
-}
-
-type OptionValueFormatError struct {
+type InvalidOptionValueFormat struct {
 	OptionDef
 	Requested ValueFormat
+}
+
+type InvalidOptionValueLength struct {
+	OptionDef
+	Length uint16
 }
 
 func (e ParseError) Error() string {
@@ -46,7 +55,15 @@ func (e UnsupportedVersion) Error() string {
 	return fmt.Sprintf("unsupported version %d, expected %d", e.Version, ProtocolVersion)
 }
 
-func (e InvalidTokenLength) Error() string {
+func (e UnsupportedType) Error() string {
+	return fmt.Sprintf("unsupported type %s", e.Type)
+}
+
+func (e UnsupportedCode) Error() string {
+	return fmt.Sprintf("unsupported code %s", e.Code)
+}
+
+func (e UnsupportedTokenLength) Error() string {
 	return fmt.Sprintf("unsupported token length %d, max is %d", e.Length, TokenMaxLength)
 }
 
@@ -62,10 +79,10 @@ func (e OptionNotFound) Error() string {
 	return fmt.Sprintf("option %q not found", e.Name)
 }
 
-func (e OptionValueLengthError) Error() string {
+func (e InvalidOptionValueLength) Error() string {
 	return fmt.Sprintf("expected option %q value length between %d and %d, got %d", e.Name, e.MinLen, e.MaxLen, e.Length)
 }
 
-func (e OptionValueFormatError) Error() string {
-	return fmt.Sprintf("unsupported option %q value format %q, actual %q", e.Name, e.Requested, e.ValueFormat)
+func (e InvalidOptionValueFormat) Error() string {
+	return fmt.Sprintf("invalid option %q value format %q, actual %q", e.Name, e.Requested, e.ValueFormat)
 }
