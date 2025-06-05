@@ -69,13 +69,25 @@ func TestMessageRoundtrip(t *testing.T) {
 					Token:     []byte{0xD0, 0xE2, 0x4D, 0xAC},
 				},
 				Options: MakeOptions(
-					MustValue(MakeOption(MaxAge, 0x424242)),
+					MustValue(MakeOption(MaxAge, uint32(0x424242))),
 				),
 				Payload: []byte("Hello"),
 			},
 		},
 	}
 	for _, test := range tests {
+		t.Run(test.name+"/marshal", func(t *testing.T) {
+			data, err := test.msg.MarshalBinary()
+			if err != nil {
+				t.Fatal("marshal:", err)
+			}
+
+			diff := cmp.Diff(test.data, data)
+			if diff != "" {
+				t.Errorf("data mismatch: (-want +got):\n%s", diff)
+			}
+		})
+
 		t.Run(test.name+"/unmarshal", func(t *testing.T) {
 			msg := &Message{}
 			err := msg.UnmarshalBinary(test.data)
@@ -89,29 +101,47 @@ func TestMessageRoundtrip(t *testing.T) {
 			}
 		})
 
-		t.Run(test.name+"/marshal", func(t *testing.T) {
-			data, err := test.msg.MarshalBinary()
-			if err != nil {
-				t.Fatal("marshal:", err)
-			}
-
-			diff := cmp.Diff(test.data, data)
-			if diff != "" {
-				t.Errorf("data mismatch: (-want +got):\n%s", diff)
-			}
-		})
 	}
 }
 
-func EquateOptions() cmp.Option {
-	return cmp.Options{
-		cmp.Transformer("Options", func(o Options) []string {
-			var opts []string
-			for _, opt := range o.data {
-				opts = append(opts, opt.String())
+func TestMessageUnmarshalError(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+		err  error
+	}{
+		{
+			name: "truncated header",
+			data: []byte{0x64, 0x45, 0x13, 0xFD, 0xD0, 0xE2},
+			err: ParseError{
+				Offset: 4,
+				Cause: TruncatedError{
+					Expected: 4,
+				},
+			},
+		},
+		{
+			name: "truncated options",
+			data: []byte{
+				0x64, 0x45, 0x13, 0xFD, 0xD0, 0xE2, 0x4D, 0xAC, // Header
+				0xD3, 0x01, 0x42, // Truncated MaxAge
+			},
+			err: ParseError{
+				Offset: 10,
+				Cause: TruncatedError{
+					Expected: 3,
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			msg := &Message{}
+			err := msg.UnmarshalBinary(test.data)
+			diff := cmp.Diff(test.err, err, cmpopts.EquateErrors())
+			if diff != "" {
+				t.Errorf("error mismatch (-want +got):\n%s", diff)
 			}
-			return opts
-		}),
-		cmpopts.IgnoreUnexported(Options{}),
+		})
 	}
 }

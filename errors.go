@@ -38,6 +38,10 @@ type InvalidOptionValueFormat struct {
 	Requested ValueFormat
 }
 
+type OptionNotRepeateable struct {
+	OptionDef
+}
+
 type InvalidOptionValueLength struct {
 	OptionDef
 	Length uint16
@@ -85,4 +89,8 @@ func (e InvalidOptionValueLength) Error() string {
 
 func (e InvalidOptionValueFormat) Error() string {
 	return fmt.Sprintf("invalid option %q value format %q, actual %q", e.Name, e.Requested, e.ValueFormat)
+}
+
+func (e OptionNotRepeateable) Error() string {
+	return fmt.Sprintf("option %q is not repeateable", e.Name)
 }

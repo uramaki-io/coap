@@ -86,19 +86,19 @@ func (r *Request) AppendBinary(data []byte) ([]byte, error) {
 	}
 
 	if r.Host != "" {
-		_ = r.Options.SetString(URIHost, r.Host)
+		Must(r.Options.SetString(URIHost, r.Host))
 	}
 
 	if r.Port != 0 {
-		_ = r.Options.SetUint(URIPort, uint32(r.Port))
+		Must(r.Options.SetUint(URIPort, uint32(r.Port)))
 	}
 
 	if r.Path != "" {
-		_ = r.Options.SetStringValues(URIPath, EncodePath(r.Path)...)
+		Must(r.Options.SetAllString(URIPath, EncodePath(r.Path)))
 	}
 
 	if len(r.Query) != 0 {
-		_ = r.Options.SetStringValues(URIQuery, r.Query...)
+		Must(r.Options.SetAllString(URIQuery, slices.Values(r.Query)))
 	}
 
 	msg := Message{
@@ -113,31 +113,30 @@ func (r *Request) AppendBinary(data []byte) ([]byte, error) {
 		Payload: r.Payload,
 	}
 
-	var err error
-	data, err = msg.AppendBinary(data)
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
+	return msg.AppendBinary(data)
 }
 
 func (r *Request) UnmarshalBinary(data []byte) error {
+	_, err := r.Decode(data, DefaultSchema)
+	return err
+}
+
+func (r *Request) Decode(data []byte, schema *Schema) ([]byte, error) {
 	msg := Message{}
 
-	err := msg.UnmarshalBinary(data)
+	data, err := msg.Decode(data, schema)
 	if err != nil {
-		return err
+		return data, err
 	}
 
 	if msg.Type != Confirmable && msg.Type != NonConfirmable {
-		return UnsupportedType{
+		return data, UnsupportedType{
 			Type: r.Type,
 		}
 	}
 
 	if msg.Code.Class() != 0 {
-		return UnsupportedCode{
+		return data, UnsupportedCode{
 			Code: msg.Code,
 		}
 	}
@@ -152,8 +151,8 @@ func (r *Request) UnmarshalBinary(data []byte) error {
 		r.Port = uint16(MustValue(port.GetUint()))
 	}
 
-	path := DecodePath(MustValue(msg.StringSeq(URIPath)))
-	query := MustValue(msg.StringSeq(URIQuery))
+	path := DecodePath(MustValue(msg.GetAllString(URIPath)))
+	query := MustValue(msg.GetAllString(URIQuery))
 
 	r.Type = msg.Type
 	r.Method = Method(msg.Code)
@@ -163,7 +162,7 @@ func (r *Request) UnmarshalBinary(data []byte) error {
 	r.Path = path
 	r.Query = slices.Collect(query)
 
-	return nil
+	return data, nil
 }
 
 func DecodePath(segments iter.Seq[string]) string {
@@ -180,17 +179,11 @@ func DecodePath(segments iter.Seq[string]) string {
 	return path.String()
 }
 
-func EncodePath(path string) []string {
+func EncodePath(path string) iter.Seq[string] {
 	path = strings.TrimPrefix(path, "/")
 	if path == "" {
 		return nil
 	}
 
-	segments := strings.Split(path, "/")
-
-	for i, segment := range segments {
-		segments[i] = strings.TrimSpace(segment)
-	}
-
-	return segments
+	return strings.SplitSeq(path, "/")
 }

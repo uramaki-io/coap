@@ -97,8 +97,10 @@ func (h *Header) Decode(data []byte) ([]byte, error) {
 		}
 	}
 
-	tpe := (b & 0x30) >> 4
-	tkl := b & 0x0f
+	tpe := Type((b & 0x30) >> 4)
+	code := Code(data[1])
+	messageID := MessageID(binary.BigEndian.Uint16(data[2:4]))
+	tkl := int(b & 0x0f)
 
 	if tkl > TokenMaxLength {
 		return data, UnsupportedTokenLength{
@@ -106,18 +108,18 @@ func (h *Header) Decode(data []byte) ([]byte, error) {
 		}
 	}
 
-	expected := HeaderLength + uint(tkl)
-	if len(data) < int(expected) {
+	data = data[HeaderLength:]
+	if len(data) < tkl {
 		return data, TruncatedError{
-			Expected: expected,
+			Expected: uint(tkl),
 		}
 	}
 
 	h.Version = version
-	h.Type = Type(tpe)
-	h.Code = Code(data[1])
-	h.MessageID = MessageID(binary.BigEndian.Uint16(data[2:4]))
-	h.Token = Token(data[4 : 4+tkl])
+	h.Type = tpe
+	h.Code = code
+	h.MessageID = messageID
+	h.Token = Token(data[:tkl])
 
-	return data[4+tkl:], nil
+	return data[tkl:], nil
 }

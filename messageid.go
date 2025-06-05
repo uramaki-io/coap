@@ -7,7 +7,7 @@ type MessageID uint16
 type MessageIDSource func() MessageID
 
 func MessageIDSequence(start MessageID) MessageIDSource {
-	var id atomic.Uint32
+	id := atomic.Uint32{}
 	id.Store(uint32(start))
 
 	return func() MessageID {

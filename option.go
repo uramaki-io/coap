@@ -3,6 +3,7 @@ package coap
 import (
 	"encoding/binary"
 	"fmt"
+	"strconv"
 )
 
 const (
@@ -76,22 +77,35 @@ func MakeOption(def OptionDef, value any) (Option, error) {
 
 	err := opt.SetValue(value)
 	if err != nil {
-		return Option{}, nil
+		return Option{}, err
 	}
 
 	return opt, nil
 }
 
+func UnrecognizedOptionDef(code uint16) OptionDef {
+	return OptionDef{
+		Code:        code,
+		ValueFormat: ValueFormatOpaque,
+		MaxLen:      1034,
+	}
+}
+
 func (o Option) String() string {
+	name := o.Name
+	if name == "" {
+		name = strconv.FormatUint(uint64(o.Code), 10)
+	}
+
 	switch o.ValueFormat {
 	case ValueFormatUint:
-		return fmt.Sprintf("Option(%s, %d)", o.Name, o.uintValue)
+		return fmt.Sprintf("Option(%s, %d)", name, o.uintValue)
 	case ValueFormatOpaque:
-		return fmt.Sprintf("Option(%s, %x)", o.Name, o.opaqueValue)
+		return fmt.Sprintf("Option(%s, %x)", name, o.opaqueValue)
 	case ValueFormatString:
-		return fmt.Sprintf("Option(%s, %q)", o.Name, o.stringValue)
+		return fmt.Sprintf("Option(%s, %q)", name, o.stringValue)
 	default:
-		return fmt.Sprintf("Option(%s, <empty>)", o.Name)
+		return fmt.Sprintf("Option(%s)", name)
 	}
 }
 
@@ -319,6 +333,10 @@ func (o *Option) Decode(data []byte, prev uint16, schema *Schema) ([]byte, error
 	}
 
 	return data[length:], nil
+}
+
+func (o OptionDef) Recognized() bool {
+	return o.Name != ""
 }
 
 // Critical returns true if option critical bit is set.

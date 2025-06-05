@@ -1,9 +1,5 @@
 package coap
 
-import (
-	"strconv"
-)
-
 var DefaultSchema = NewSchema()
 
 func init() {
@@ -74,13 +70,7 @@ func (s *Schema) AddOptions(options ...OptionDef) {
 func (s *Schema) Option(code uint16) OptionDef {
 	option, ok := s.options[code]
 	if !ok {
-		return OptionDef{
-			Code:        code,
-			Name:        strconv.Itoa(int(code)),
-			ValueFormat: ValueFormatOpaque,
-			MinLen:      0,
-			MaxLen:      1034,
-		}
+		return UnrecognizedOptionDef(code)
 	}
 
 	return option
