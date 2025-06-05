@@ -37,7 +37,7 @@ type Response struct {
 	Payload []byte
 }
 
-// ResponseCode
+// ResponseCode represents a CoAP response code.
 //
 // https://datatracker.ietf.org/doc/html/rfc7252#section-5.9
 type ResponseCode uint8

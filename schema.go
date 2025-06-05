@@ -51,6 +51,7 @@ type Schema struct {
 	mediaTypes map[uint16]MediaType
 }
 
+// NewSchema creates a new Schema instance with empty options and media types.
 func NewSchema() *Schema {
 	return &Schema{
 		options:    map[uint16]OptionDef{},
@@ -58,6 +59,7 @@ func NewSchema() *Schema {
 	}
 }
 
+// AddOptions adds options.
 func (s *Schema) AddOptions(options ...OptionDef) *Schema {
 	for _, option := range options {
 		s.options[option.Code] = option
@@ -66,6 +68,7 @@ func (s *Schema) AddOptions(options ...OptionDef) *Schema {
 	return s
 }
 
+// AddMediaTypes adds media types.
 func (s *Schema) AddMediaTypes(mediaTypes ...MediaType) *Schema {
 	for _, mediaType := range mediaTypes {
 		s.mediaTypes[mediaType.Code] = mediaType
@@ -74,6 +77,7 @@ func (s *Schema) AddMediaTypes(mediaTypes ...MediaType) *Schema {
 	return s
 }
 
+// Option retrieves an option by code.
 func (s *Schema) Option(code uint16) OptionDef {
 	option, ok := s.options[code]
 	if !ok {
@@ -83,6 +87,7 @@ func (s *Schema) Option(code uint16) OptionDef {
 	return option
 }
 
+// MediaType retrieves a media type by code.
 func (s *Schema) MediaType(code uint16) MediaType {
 	mediaType, ok := s.mediaTypes[code]
 	if !ok {
