@@ -25,40 +25,6 @@ type Option struct {
 	stringValue string
 }
 
-type OptionDef struct {
-	Name        string
-	Code        uint16
-	ValueFormat ValueFormat
-	Repeatable  bool
-	MinLen      uint16
-	MaxLen      uint16
-}
-
-type ValueFormat uint8
-
-const (
-	ValueFormatEmpty  ValueFormat = 0x00
-	ValueFormatUint   ValueFormat = 0x01
-	ValueFormatOpaque ValueFormat = 0x02
-	ValueFormatString ValueFormat = 0x03
-)
-
-var valueFormatString = map[ValueFormat]string{
-	ValueFormatEmpty:  "empty",
-	ValueFormatUint:   "uint",
-	ValueFormatOpaque: "opaque",
-	ValueFormatString: "string",
-}
-
-func (f ValueFormat) String() string {
-	s, ok := valueFormatString[f]
-	if !ok {
-		panic("unknown value format: " + strconv.FormatUint(uint64(f), 10))
-	}
-
-	return s
-}
-
 func Must(err error) {
 	if err != nil {
 		panic(err)
@@ -93,14 +59,6 @@ func MakeOption(def OptionDef, value any) (Option, error) {
 	}
 
 	return opt, nil
-}
-
-func UnrecognizedOptionDef(code uint16) OptionDef {
-	return OptionDef{
-		Code:        code,
-		ValueFormat: ValueFormatOpaque,
-		MaxLen:      1034,
-	}
 }
 
 func (o Option) String() string {
@@ -355,27 +313,6 @@ func (o *Option) Decode(data []byte, prev uint16, schema *Schema) ([]byte, error
 	}
 
 	return data[length:], nil
-}
-
-func (o OptionDef) Recognized() bool {
-	return o.Name != ""
-}
-
-// Critical returns true if option critical bit is set.
-func (o OptionDef) Critical() bool {
-	return o.Code&0x01 == 0x01
-}
-
-func (o OptionDef) Unsafe() bool {
-	return o.Code&0x02 == 0x02
-}
-
-func (o OptionDef) NoCacheKey() bool {
-	return o.Code&0x1E == 0x1c
-}
-
-func (o OptionDef) String() string {
-	return o.Name
 }
 
 // Len32 returns minimum number of bytes required to encode a uint32 value in big-endian format

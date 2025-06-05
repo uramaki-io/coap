@@ -1,9 +1,10 @@
 package coap
 
-var DefaultSchema = NewSchema()
-
-func init() {
-	DefaultSchema.AddOptions(
+// DefaultSchema defines well-known CoAP options and media types.
+//
+// https://www.iana.org/assignments/core-parameters/core-parameters.xhtml#content-formats
+var DefaultSchema = NewSchema().
+	AddOptions(
 		IfMatch,
 		URIHost,
 		URIPort,
@@ -24,47 +25,53 @@ func init() {
 		Size1,
 		Size2,
 		NoResponse,
+	).
+	AddMediaTypes(
+		MediaTypeTextPlain,
+		MediaTypeImageGIF,
+		MediaTypeImagePNG,
+		MediaTypeImageJPEG,
+		MediaTypeApplicationCOSEEncrypt0,
+		MediaTypeApplicationCOSEMac0,
+		MediaTypeApplicationCBORSign1,
+		MediaTypeApplicationLinkFormat,
+		MediaTypeApplicationXML,
+		MediaTypeApplicationOctetStream,
+		MediaTypeApplicationExi,
+		MediaTypeApplicationJSON,
+		MediaTypeApplicationCBOR,
+		MediaTypeApplicationCBORSeq,
 	)
-}
 
+// Schema contains defintions of CoAP options and media types.
+//
+// It provides methods to add and retrieve options and media types by their code.
 type Schema struct {
-	options map[uint16]OptionDef
+	options    map[uint16]OptionDef
+	mediaTypes map[uint16]MediaType
 }
-
-// Options
-var (
-	IfMatch       = OptionDef{Code: 1, Name: "IfMatch", ValueFormat: ValueFormatOpaque, Repeatable: true, MaxLen: 8}
-	URIHost       = OptionDef{Code: 3, Name: "URIHost", ValueFormat: ValueFormatString, MinLen: 1, MaxLen: 255}
-	ETag          = OptionDef{Code: 4, Name: "ETag", ValueFormat: ValueFormatOpaque, Repeatable: true, MinLen: 1, MaxLen: 8}
-	IfNoneMatch   = OptionDef{Code: 5, Name: "IfNoneMatch", ValueFormat: ValueFormatEmpty}
-	Observe       = OptionDef{Code: 6, Name: "Observe", ValueFormat: ValueFormatUint, MaxLen: 3}
-	URIPort       = OptionDef{Code: 7, Name: "URIPort", ValueFormat: ValueFormatUint, MaxLen: 2}
-	LocationPath  = OptionDef{Code: 8, Name: "LocationPath", ValueFormat: ValueFormatString, Repeatable: true, MaxLen: 255}
-	URIPath       = OptionDef{Code: 11, Name: "URIPath", ValueFormat: ValueFormatString, Repeatable: true, MaxLen: 255}
-	ContentFormat = OptionDef{Code: 12, Name: "ContentFormat", ValueFormat: ValueFormatUint, MaxLen: 2}
-	MaxAge        = OptionDef{Code: 14, Name: "MaxAge", ValueFormat: ValueFormatUint, MaxLen: 4}
-	URIQuery      = OptionDef{Code: 15, Name: "URIQuery", ValueFormat: ValueFormatString, Repeatable: true, MaxLen: 255}
-	Accept        = OptionDef{Code: 17, Name: "Accept", ValueFormat: ValueFormatUint, MaxLen: 2}
-	LocationQuery = OptionDef{Code: 20, Name: "LocationQuery", ValueFormat: ValueFormatString, Repeatable: true, MaxLen: 255}
-	Block1        = OptionDef{Code: 27, Name: "Block1", ValueFormat: ValueFormatUint, MaxLen: 3}
-	Block2        = OptionDef{Code: 23, Name: "Block2", ValueFormat: ValueFormatUint, MaxLen: 3}
-	ProxyURI      = OptionDef{Code: 35, Name: "ProxyURI", ValueFormat: ValueFormatString, MinLen: 1, MaxLen: 1034}
-	ProxyScheme   = OptionDef{Code: 39, Name: "ProxyScheme", ValueFormat: ValueFormatString, MinLen: 1, MaxLen: 255}
-	Size1         = OptionDef{Code: 60, Name: "Size1", ValueFormat: ValueFormatUint, MaxLen: 4}
-	Size2         = OptionDef{Code: 28, Name: "Size2", ValueFormat: ValueFormatUint, MaxLen: 4}
-	NoResponse    = OptionDef{Code: 258, Name: "NoResponse", ValueFormat: ValueFormatUint, MaxLen: 1}
-)
 
 func NewSchema() *Schema {
 	return &Schema{
-		options: map[uint16]OptionDef{},
+		options:    map[uint16]OptionDef{},
+		mediaTypes: map[uint16]MediaType{},
 	}
 }
 
-func (s *Schema) AddOptions(options ...OptionDef) {
+func (s *Schema) AddOptions(options ...OptionDef) *Schema {
 	for _, option := range options {
 		s.options[option.Code] = option
 	}
+
+	return s
+}
+
+func (s *Schema) AddMediaTypes(mediaTypes ...MediaType) *Schema {
+	for _, mediaType := range mediaTypes {
+		s.mediaTypes[mediaType.Code] = mediaType
+	}
+
+	return s
 }
 
 func (s *Schema) Option(code uint16) OptionDef {
@@ -74,4 +81,13 @@ func (s *Schema) Option(code uint16) OptionDef {
 	}
 
 	return option
+}
+
+func (s *Schema) MediaType(code uint16) MediaType {
+	mediaType, ok := s.mediaTypes[code]
+	if !ok {
+		return UnrecognizedMediaType(code)
+	}
+
+	return mediaType
 }

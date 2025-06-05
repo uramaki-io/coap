@@ -37,9 +37,9 @@ func TestOptionsGetSet(t *testing.T) {
 				t.Fatal("unexpected error:", err)
 			}
 
-			value, err := opts.GetValue(test.option)
-			if err != nil {
-				t.Fatal("unexpected error:", err)
+			value, ok := opts.GetValue(test.option)
+			if !ok {
+				t.Fatal("expected value to exist:", err)
 			}
 
 			diff := cmp.Diff(test.value, value)

@@ -9,20 +9,43 @@ import (
 
 // Request represents a CoAP request message.
 type Request struct {
-	Type      Type
-	Method    Method
-	MessageID MessageID
-	Token     Token
+	// Type is the message type, either Confirmable or NonConfirmable.
+	//
+	// If not set, it defaults to Confirmable.
+	Type Type
 
-	Host  string
-	Port  uint16
-	Path  string
+	// Method
+	Method Method
+
+	// MessageID
+	MessageID MessageID
+
+	// Token
+	Token Token
+
+	// Options
+	Options Options
+
+	// Host overrides URIHost option if not empty.
+	Host string
+
+	// Port overrides URIPort option if not zero.
+	Port uint16
+
+	// Path overrides URIPath options if not empty.
+	Path string
+
+	// Query overrides URIQuery options if not empty.
 	Query []string
 
-	Options Options
+	// ContentFormat overrides ContentFormat option.
+	ContentFormat *MediaType
+
+	// Payload
 	Payload []byte
 }
 
+// Method represents a CoAP request method code.
 type Method Code
 
 // Method 0.xx Codes
@@ -37,6 +60,7 @@ const (
 	IPATCH Method = 0x07
 )
 
+// String implements fmt.Stringer.
 func (r *Request) String() string {
 	return fmt.Sprintf("Request(Type=%s, MessageID=%d, Method=%s, Path=%s)", r.Type, r.MessageID, r.Method, r.Path)
 }
@@ -50,6 +74,7 @@ var methodString = map[Method]string{
 	IPATCH: "IPATCH",
 }
 
+// String implements fmt.Stringer for Method.
 func (m Method) String() string {
 	s, ok := methodString[m]
 	if !ok {
@@ -59,6 +84,7 @@ func (m Method) String() string {
 	return s
 }
 
+// MarshalBinary implements encoding.BinaryMarshaler
 func (r *Request) MarshalBinary() ([]byte, error) {
 	data, err := r.AppendBinary(nil)
 	if err != nil {
@@ -118,11 +144,17 @@ func (r Request) AppendBinary(data []byte) ([]byte, error) {
 	return msg.AppendBinary(data)
 }
 
+// UnmarshalBinary implements encoding.BinaryUnmarshaler
 func (r *Request) UnmarshalBinary(data []byte) error {
 	_, err := r.Decode(data, DefaultSchema)
 	return err
 }
 
+// Decode decodes a CoAP request message from the given data using the provided schema.
+//
+// It panics if the schema is nil.
+// Returns UnsupportedType error if the message type is not Confirmable or NonConfirmable.
+// Returns UnsupportedCode error if the message code is not a valid request method (0.xx).
 func (r *Request) Decode(data []byte, schema *Schema) ([]byte, error) {
 	msg := Message{}
 
@@ -167,6 +199,7 @@ func (r *Request) Decode(data []byte, schema *Schema) ([]byte, error) {
 	return data, nil
 }
 
+// DecodePath decodes a sequence of path segments into a single path string.
 func DecodePath(segments iter.Seq[string]) string {
 	if segments == nil {
 		return "/"
@@ -181,6 +214,7 @@ func DecodePath(segments iter.Seq[string]) string {
 	return path.String()
 }
 
+// EncodePath encodes a path string into a sequence of path segments.
 func EncodePath(path string) iter.Seq[string] {
 	path = strings.TrimPrefix(path, "/")
 	if path == "" {
