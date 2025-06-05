@@ -384,7 +384,6 @@ func (o Options) AppendBinary(data []byte) ([]byte, error) {
 
 // Decode decodes options from data using schema.
 //
-// Panics if schema is nil.
 // Returns the remaining data after options have been decoded.
 // Returns TruncatedError if the data is too short to decode the option.
 // Returns InvalidOptionValueLength if the decoded length does not match the expected length defined in OptionDef.
@@ -393,7 +392,7 @@ func (o Options) AppendBinary(data []byte) ([]byte, error) {
 // Unrecognized options are silently ignored if they are elective.
 func (o *Options) Decode(data []byte, schema *Schema) ([]byte, error) {
 	if schema == nil {
-		panic("schema must not be nil")
+		schema = DefaultSchema
 	}
 
 	prev := uint16(0)

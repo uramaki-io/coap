@@ -152,10 +152,13 @@ func (r *Request) UnmarshalBinary(data []byte) error {
 
 // Decode decodes a CoAP request message from the given data using the provided schema.
 //
-// It panics if the schema is nil.
 // Returns UnsupportedType error if the message type is not Confirmable or NonConfirmable.
 // Returns UnsupportedCode error if the message code is not a valid request method (0.xx).
 func (r *Request) Decode(data []byte, schema *Schema) ([]byte, error) {
+	if schema == nil {
+		schema = DefaultSchema
+	}
+
 	msg := Message{}
 
 	data, err := msg.Decode(data, schema)

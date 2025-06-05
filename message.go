@@ -47,11 +47,10 @@ func (m *Message) UnmarshalBinary(data []byte) error {
 
 // Decode decodes the CoAP message from the provided data slice using the given schema.
 //
-// It panics if the schema is nil.
 // Returns the remaining data after the message and UnarshalError if any error occurs during decoding.
 func (m *Message) Decode(data []byte, schema *Schema) ([]byte, error) {
 	if schema == nil {
-		panic("schema must not be nil")
+		schema = DefaultSchema
 	}
 
 	length := len(data)

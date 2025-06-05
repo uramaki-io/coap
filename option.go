@@ -305,7 +305,7 @@ func (o Option) Encode(data []byte, prev uint16) ([]byte, error) {
 // Returns InvalidOptionValueLength if the decoded length does not match the expected length defined in OptionDef.
 func (o *Option) Decode(data []byte, prev uint16, schema *Schema) ([]byte, error) {
 	if schema == nil {
-		panic("schema must not be nil")
+		schema = DefaultSchema
 	}
 
 	if len(data) == 0 {

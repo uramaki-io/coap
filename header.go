@@ -36,7 +36,8 @@ type Header struct {
 }
 
 // Code represents request method or response code.
-// It is a 1-byte value where the first 3 bits represent the class and the last 5 bits represent the detail.
+//
+// 1-byte value where the first 3 bits represent the class and the last 5 bits represent the detail.
 type Code uint8
 
 // Type represents the message type in CoAP.
@@ -61,15 +62,14 @@ const (
 
 // MessageID represents the unique identifier for a CoAP message.
 //
-// It is a 2-byte value that is used for message deduplication and retransmission.
+// 2-byte value that is used for message deduplication and retransmission.
 // Usually it is sequential.
 type MessageID uint16
 
 // MessageIDSource is a source function that generates
 type MessageIDSource func() MessageID
 
-// Token represents the unique random token for matching requests and responses.
-// It is a byte slice with a maximum length of 8 bytes.
+// Token represents the unique random token for matching requests and responses with maximum length of 8 bytes.
 type Token []byte
 
 // TokenSource is a function that generates a random token of a specified length.
@@ -77,7 +77,7 @@ type TokenSource func() Token
 
 // MessageIDSequence returns a MessageIDSource that generates sequential message IDs starting from the specified value.
 //
-// It uses an atomic counter. Values wrap around when they reach the maximum value of 65535 (0xffff).
+// Uses an atomic counter. Values wrap around when they reach the maximum value of 65535 (0xffff).
 func MessageIDSequence(start MessageID) MessageIDSource {
 	id := atomic.Uint32{}
 	id.Store(uint32(start))

@@ -43,9 +43,9 @@ var DefaultSchema = NewSchema().
 		MediaTypeApplicationCBORSeq,
 	)
 
-// Schema contains defintions of CoAP options and media types.
+// Schema contains defintions of options and media types used in encoding and decoding CoAP messages.
 //
-// It provides methods to add and retrieve options and media types by their code.
+// Provides methods to add and retrieve options and media types by their code.
 type Schema struct {
 	options    map[uint16]OptionDef
 	mediaTypes map[uint16]MediaType
