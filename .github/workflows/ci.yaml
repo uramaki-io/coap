@@ -14,8 +14,9 @@ jobs:
       - name: Lint
         uses: docker://ghcr.io/morphy2k/revive-action:v2
       - name: Test
-        run: |
-          go test -race -v -coverprofile=coverage.txt -covermode=atomic ./...
+        uses: robherley/go-test-action@v0
+        with:
+          testArguments: -coverprofile=coverage.txt -covermode=atomic ./...
       - name: Upload Coverage
         uses: codecov/codecov-action@v5
         with:

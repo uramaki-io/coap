@@ -14,4 +14,3 @@ The library supports **UDP** and **DTLS** protocols.
 ## Structure
 
 The `Message` type represents a complete CoAP message, encapsulating the protocol's header, options, and payload.
-

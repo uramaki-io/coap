@@ -7,9 +7,7 @@ import (
 
 // Response represents a CoAP response message.
 type Response struct {
-	// Type
-	//
-	// If not set, it defaults to Confirmable.
+	// Type, defaults to Confirmable.
 	Type Type
 
 	// Code
@@ -83,6 +81,7 @@ const (
 )
 
 // Server Error 5.xx Response Codes
+//
 // https://datatracker.ietf.org/doc/html/rfc7252#section-5.9.3
 const (
 	InternalServerError  ResponseCode = 0xa0
