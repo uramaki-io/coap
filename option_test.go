@@ -127,40 +127,6 @@ func TestOptionSetValue(t *testing.T) {
 	}
 }
 
-func TestOptionAccessors(t *testing.T) {
-	t.Run("GetUint", func(t *testing.T) {
-		opt := MustMakeOption(URIPort, uint32(0x4242))
-		value, err := opt.GetUint()
-		if err != nil {
-			t.Fatal("unexpected error:", err)
-		}
-
-		if value != 0x4242 {
-			t.Errorf("unexpected value, want %d, got %d", 0x4242, value)
-		}
-
-		expected := InvalidOptionValueFormat{
-			OptionDef: opt.OptionDef,
-			Requested: ValueFormatString,
-		}
-		_, err = opt.GetString()
-		diff := cmp.Diff(expected, err, cmpopts.EquateErrors())
-		if diff != "" {
-			t.Errorf("error mismatch (-want +got):\n%s", diff)
-		}
-
-		expected = InvalidOptionValueFormat{
-			OptionDef: opt.OptionDef,
-			Requested: ValueFormatOpaque,
-		}
-		_, err = opt.GetOpaque()
-		diff = cmp.Diff(expected, err, cmpopts.EquateErrors())
-		if diff != "" {
-			t.Errorf("error mismatch (-want +got):\n%s", diff)
-		}
-	})
-}
-
 func TestOptionRoundtrip(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -344,5 +310,14 @@ func TestOptionDecodeError(t *testing.T) {
 				t.Errorf("error mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func expectErr(t testing.TB, err error, expected error) {
+	t.Helper()
+
+	diff := cmp.Diff(expected, err, cmpopts.EquateErrors())
+	if diff != "" {
+		t.Errorf("error mismatch (-want +got):\n%s", diff)
 	}
 }

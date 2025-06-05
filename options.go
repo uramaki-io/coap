@@ -21,6 +21,11 @@ func MakeOptions(data ...Option) Options {
 	}
 }
 
+func (o Options) Contains(def OptionDef) bool {
+	i := Index(o.data, def)
+	return i != -1
+}
+
 func (o Options) Get(def OptionDef) (Option, bool) {
 	i := Index(o.data, def)
 	if i == -1 {
@@ -30,9 +35,14 @@ func (o Options) Get(def OptionDef) (Option, bool) {
 	return o.data[i], true
 }
 
-func (o Options) Has(def OptionDef) bool {
-	i := Index(o.data, def)
-	return i != -1
+func (o *Options) Set(opt Option) {
+	i := Index(o.data, opt.OptionDef)
+	if i == -1 {
+		o.data = append(o.data, opt)
+		return
+	}
+
+	o.data[i] = opt
 }
 
 func (o Options) GetAll(def OptionDef) iter.Seq[Option] {
@@ -55,18 +65,34 @@ func (o *Options) ClearOption(def OptionDef) {
 	})
 }
 
-func (o *Options) SetOption(opt Option) {
-	i := Index(o.data, opt.OptionDef)
-	if i == -1 {
-		o.data = append(o.data, opt)
-		return
-	}
-
-	o.data[i] = opt
-}
-
 func (o *Options) ClearOptions() {
 	o.data = o.data[0:]
+}
+
+func (o Options) GetValue(def OptionDef) (any, error) {
+	opt, ok := o.Get(def)
+	if !ok {
+		return nil, OptionNotFound{
+			OptionDef: def,
+		}
+	}
+
+	return opt.GetValue(), nil
+}
+
+func (o *Options) SetValue(def OptionDef, value any) error {
+	opt := Option{
+		OptionDef: def,
+	}
+
+	err := opt.SetValue(value)
+	if err != nil {
+		return err
+	}
+
+	o.Set(opt)
+
+	return nil
 }
 
 func (o Options) GetUint(def OptionDef) (uint32, error) {
@@ -90,7 +116,7 @@ func (o *Options) SetUint(def OptionDef, value uint32) error {
 		return err
 	}
 
-	o.SetOption(opt)
+	o.Set(opt)
 
 	return nil
 }
@@ -154,7 +180,7 @@ func (o *Options) SetOpaque(def OptionDef, value []byte) error {
 		return err
 	}
 
-	o.SetOption(opt)
+	o.Set(opt)
 
 	return nil
 }
@@ -218,7 +244,7 @@ func (o *Options) SetString(def OptionDef, value string) error {
 		return err
 	}
 
-	o.SetOption(opt)
+	o.Set(opt)
 
 	return nil
 }

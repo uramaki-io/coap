@@ -1,8 +1,10 @@
 package coap
 
 import (
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"sync/atomic"
 )
 
 const (
@@ -21,18 +23,6 @@ type Header struct {
 
 type Code uint8
 
-func (c Code) Class() uint8 {
-	return uint8((c & 0xe0) >> 5)
-}
-
-func (c Code) Detail() uint8 {
-	return uint8(c & 0x1f)
-}
-
-func (c Code) String() string {
-	return fmt.Sprintf("%d.%02d", c.Class(), c.Detail())
-}
-
 type Type uint8
 
 const (
@@ -42,20 +32,39 @@ const (
 	Reset           Type = 0x03
 )
 
-var typeString = map[Type]string{
-	Confirmable:     "CON",
-	NonConfirmable:  "NON",
-	Acknowledgement: "ACK",
-	Reset:           "RST",
-}
+type MessageID uint16
 
-func (t Type) String() string {
-	s, ok := typeString[t]
-	if !ok {
-		return fmt.Sprintf("Type(%d)", t)
+type MessageIDSource func() MessageID
+
+const TokenLength = 4
+
+type Token []byte
+
+type TokenSource func() Token
+
+func RandTokenSource(length uint) TokenSource {
+	switch {
+	case length == 0:
+		length = TokenLength
+	case length > TokenMaxLength:
+		length = TokenMaxLength
 	}
 
-	return s
+	return func() Token {
+		token := make(Token, length)
+		_, _ = rand.Read(token) // rand.Read never returns an error
+
+		return token
+	}
+}
+
+func MessageIDSequence(start MessageID) MessageIDSource {
+	id := atomic.Uint32{}
+	id.Store(uint32(start))
+
+	return func() MessageID {
+		return MessageID(id.Add(1))
+	}
 }
 
 // AppendBinary implements encoding.BinaryAppender
@@ -124,4 +133,32 @@ func (h *Header) Decode(data []byte) ([]byte, error) {
 	h.Token = Token(data[:tkl])
 
 	return data[tkl:], nil
+}
+
+func (c Code) Class() uint8 {
+	return uint8((c & 0xe0) >> 5)
+}
+
+func (c Code) Detail() uint8 {
+	return uint8(c & 0x1f)
+}
+
+func (c Code) String() string {
+	return fmt.Sprintf("%d.%02d", c.Class(), c.Detail())
+}
+
+var typeString = map[Type]string{
+	Confirmable:     "CON",
+	NonConfirmable:  "NON",
+	Acknowledgement: "ACK",
+	Reset:           "RST",
+}
+
+func (t Type) String() string {
+	s, ok := typeString[t]
+	if !ok {
+		return fmt.Sprintf("Type(%d)", t)
+	}
+
+	return s
 }
