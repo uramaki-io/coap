@@ -107,6 +107,48 @@ func RandTokenSource(length uint) TokenSource {
 	}
 }
 
+// EncodeExtend encodes a uint16 value as an extended delta or length value in the CoAP header format.
+//
+// Returns the encoded header byte and the updated data slice.
+func EncodeExtend(data []byte, v uint16) (uint8, []byte) {
+	switch {
+	case v < ExtendByteOffset:
+		return uint8(v), data
+	case v < ExtendDwordOffset:
+		data = append(data, uint8(v-ExtendByteOffset))
+		return ExtendByte, data
+	default:
+		data = binary.BigEndian.AppendUint16(data, v-ExtendDwordOffset)
+		return ExtendDword, data
+	}
+}
+
+// DecodeExtend decodes an extended delta or length value from the CoAP header format.
+//
+// Returns the decoded value, the remaining data slice, and an error if any.
+func DecodeExtend(data []byte, v uint8) (uint16, []byte, error) {
+	switch v {
+	case ExtendByte:
+		if len(data) < 1 {
+			return 0, data, TruncatedError{
+				Expected: 1,
+			}
+		}
+		return uint16(data[0]) + ExtendByteOffset, data[1:], nil
+	case ExtendDword:
+		if len(data) < 2 {
+			return 0, data, TruncatedError{
+				Expected: 2,
+			}
+		}
+		return binary.BigEndian.Uint16(data) + ExtendDwordOffset, data[2:], nil
+	case ExtendInvalid:
+		return 0, data, UnsupportedExtendError{}
+	default:
+		return uint16(v), data, nil
+	}
+}
+
 // AppendBinary encodes the CoAP message header to the provided data slice.
 //
 // Returns the updated data slice with the header appended and any error encountered during encoding.

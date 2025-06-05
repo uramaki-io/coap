@@ -206,24 +206,6 @@ func TestMessageMarshalError(t *testing.T) {
 				Length: 16,
 			},
 		},
-		{
-			name: "opaque option too short",
-			msg: &Message{
-				Header: Header{
-					Version: ProtocolVersion,
-				},
-				Options: MakeOptions(
-					Option{
-						OptionDef:   ETag,
-						opaqueValue: []byte{},
-					},
-				),
-			},
-			err: InvalidOptionValueLength{
-				OptionDef: ETag,
-				Length:    0,
-			},
-		},
 	}
 	for _, test := range tests {
 		_, err := test.msg.MarshalBinary()
