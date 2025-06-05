@@ -40,25 +40,22 @@ func (r *Request) String() string {
 	return fmt.Sprintf("Request(Type=%s, MessageID=%d, Method=%s, Path=%s)", r.Type, r.MessageID, r.Method, r.Path)
 }
 
+var methodString = map[Method]string{
+	GET:    "GET",
+	POST:   "POST",
+	PUT:    "PUT",
+	DELETE: "DELETE",
+	FETCH:  "FETCH",
+	IPATCH: "IPATCH",
+}
+
 func (m Method) String() string {
-	switch m {
-	case GET:
-		return "GET"
-	case POST:
-		return "POST"
-	case PUT:
-		return "PUT"
-	case DELETE:
-		return "DELETE"
-	case FETCH:
-		return "FETCH"
-	case PATCH:
-		return "PATCH"
-	case IPATCH:
-		return "IPATCH"
-	default:
-		return Code(m).String()
+	s, ok := methodString[m]
+	if !ok {
+		return fmt.Sprintf("Method(%s)", Code(m))
 	}
+
+	return s
 }
 
 func (r *Request) MarshalBinary() ([]byte, error) {

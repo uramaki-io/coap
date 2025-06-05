@@ -1,6 +1,7 @@
 package coap
 
 import (
+	"reflect"
 	"slices"
 	"testing"
 
@@ -15,22 +16,54 @@ var (
 	bytes272 = slices.Repeat(bytes8, 34)      // length extend dword
 )
 
-func TestOptionSetBytes(t *testing.T) {
+func TestOptionSetValue(t *testing.T) {
 	tests := []struct {
 		name   string
 		option OptionDef
-		data   []byte
+		value  any
 		err    error
 	}{
 		{
-			name:   "valid opaque value",
-			option: IfMatch,
-			data:   bytes8,
+			name:   "unsupported value",
+			option: URIPort,
+			value:  42.0,
+			err: InvalidOptionValueFormat{
+				OptionDef: URIPort,
+				Unknown:   reflect.TypeOf(42.0),
+			},
 		},
 		{
-			name:   "not an opaque value",
+			name:   "valid uint value",
+			option: URIPort,
+			value:  uint32(0x4242),
+		},
+		{
+			name:   "not a uint value",
+			option: URIPort,
+			value:  "not a uint",
+			err: InvalidOptionValueFormat{
+				OptionDef: URIPort,
+				Requested: ValueFormatString,
+			},
+		},
+		{
+			name:   "uint value too long",
+			option: URIPort,
+			value:  uint32(0x42424242),
+			err: InvalidOptionValueLength{
+				OptionDef: URIPort,
+				Length:    4,
+			},
+		},
+		{
+			name:   "valid opaque value",
+			option: IfMatch,
+			value:  bytes8,
+		},
+		{
+			name:   "not a opaque value",
 			option: URIHost,
-			data:   bytes8,
+			value:  bytes8,
 			err: InvalidOptionValueFormat{
 				OptionDef: URIHost,
 				Requested: ValueFormatOpaque,
@@ -39,7 +72,7 @@ func TestOptionSetBytes(t *testing.T) {
 		{
 			name:   "opaque value too long",
 			option: IfMatch,
-			data:   bytes272,
+			value:  bytes272,
 			err: InvalidOptionValueLength{
 				OptionDef: IfMatch,
 				Length:    272,
@@ -48,8 +81,32 @@ func TestOptionSetBytes(t *testing.T) {
 		{
 			name:   "opaque value too short",
 			option: ETag,
+			value:  []byte{},
 			err: InvalidOptionValueLength{
 				OptionDef: ETag,
+				Length:    0,
+			},
+		},
+		{
+			name:   "valid string value",
+			option: URIHost,
+			value:  "example.com",
+		},
+		{
+			name:   "not a string value",
+			option: URIHost,
+			value:  bytes8,
+			err: InvalidOptionValueFormat{
+				OptionDef: URIHost,
+				Requested: ValueFormatOpaque,
+			},
+		},
+		{
+			name:   "string value too short",
+			option: URIHost,
+			value:  "",
+			err: InvalidOptionValueLength{
+				OptionDef: URIHost,
 				Length:    0,
 			},
 		},
@@ -61,13 +118,47 @@ func TestOptionSetBytes(t *testing.T) {
 				OptionDef: test.option,
 			}
 
-			err := opt.SetOpaque(test.data)
+			err := opt.SetValue(test.value)
 			diff := cmp.Diff(test.err, err, cmpopts.EquateErrors())
 			if diff != "" {
 				t.Errorf("error mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
+}
+
+func TestOptionAccessors(t *testing.T) {
+	t.Run("GetUint", func(t *testing.T) {
+		opt := MustMakeOption(URIPort, uint32(0x4242))
+		value, err := opt.GetUint()
+		if err != nil {
+			t.Fatal("unexpected error:", err)
+		}
+
+		if value != 0x4242 {
+			t.Errorf("unexpected value, want %d, got %d", 0x4242, value)
+		}
+
+		expected := InvalidOptionValueFormat{
+			OptionDef: opt.OptionDef,
+			Requested: ValueFormatString,
+		}
+		_, err = opt.GetString()
+		diff := cmp.Diff(expected, err, cmpopts.EquateErrors())
+		if diff != "" {
+			t.Errorf("error mismatch (-want +got):\n%s", diff)
+		}
+
+		expected = InvalidOptionValueFormat{
+			OptionDef: opt.OptionDef,
+			Requested: ValueFormatOpaque,
+		}
+		_, err = opt.GetOpaque()
+		diff = cmp.Diff(expected, err, cmpopts.EquateErrors())
+		if diff != "" {
+			t.Errorf("error mismatch (-want +got):\n%s", diff)
+		}
+	})
 }
 
 func TestOptionRoundtrip(t *testing.T) {

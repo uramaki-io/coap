@@ -3,6 +3,7 @@ package coap
 import (
 	"encoding/binary"
 	"fmt"
+	"reflect"
 	"strconv"
 )
 
@@ -35,25 +36,26 @@ type OptionDef struct {
 type ValueFormat uint8
 
 const (
-	ValueFormatEmpty ValueFormat = iota
-	ValueFormatUint
-	ValueFormatOpaque
-	ValueFormatString
+	ValueFormatEmpty  ValueFormat = 0x00
+	ValueFormatUint   ValueFormat = 0x01
+	ValueFormatOpaque ValueFormat = 0x02
+	ValueFormatString ValueFormat = 0x03
 )
 
+var valueFormatString = map[ValueFormat]string{
+	ValueFormatEmpty:  "empty",
+	ValueFormatUint:   "uint",
+	ValueFormatOpaque: "opaque",
+	ValueFormatString: "string",
+}
+
 func (f ValueFormat) String() string {
-	switch f {
-	case ValueFormatEmpty:
-		return "empty"
-	case ValueFormatUint:
-		return "uint"
-	case ValueFormatOpaque:
-		return "opaque"
-	case ValueFormatString:
-		return "string"
-	default:
-		return "unknown"
+	s, ok := valueFormatString[f]
+	if !ok {
+		panic("unknown value format: " + strconv.FormatUint(uint64(f), 10))
 	}
+
+	return s
 }
 
 func Must(err error) {
@@ -68,6 +70,15 @@ func MustValue[T any](value T, err error) T {
 	}
 
 	return value
+}
+
+func MustMakeOption(def OptionDef, value any) Option {
+	opt, err := MakeOption(def, value)
+	if err != nil {
+		panic(err)
+	}
+
+	return opt
 }
 
 func MakeOption(def OptionDef, value any) (Option, error) {
@@ -99,11 +110,11 @@ func (o Option) String() string {
 
 	switch o.ValueFormat {
 	case ValueFormatUint:
-		return fmt.Sprintf("Option(%s, %d)", name, o.uintValue)
+		return fmt.Sprintf("%s(%d)", name, o.uintValue)
 	case ValueFormatOpaque:
-		return fmt.Sprintf("Option(%s, %x)", name, o.opaqueValue)
+		return fmt.Sprintf("%s(%x)", name, o.opaqueValue)
 	case ValueFormatString:
-		return fmt.Sprintf("Option(%s, %q)", name, o.stringValue)
+		return fmt.Sprintf("%s(%q)", name, o.stringValue)
 	default:
 		return fmt.Sprintf("Option(%s)", name)
 	}
@@ -131,7 +142,10 @@ func (o *Option) SetValue(value any) error {
 	case string:
 		return o.SetString(v)
 	default:
-		return fmt.Errorf("unsupported value type %T for option %q", value, o.Name)
+		return InvalidOptionValueFormat{
+			OptionDef: o.OptionDef,
+			Unknown:   reflect.TypeOf(value),
+		}
 	}
 }
 
@@ -242,6 +256,13 @@ func (o Option) Encode(data []byte, prev uint16) ([]byte, error) {
 		length = uint16(len(o.opaqueValue))
 	case ValueFormatString:
 		length = uint16(len(o.stringValue))
+	}
+
+	if length < o.MinLen || length > o.MaxLen {
+		return data, InvalidOptionValueLength{
+			OptionDef: o.OptionDef,
+			Length:    length,
+		}
 	}
 
 	// reserve space for delta/length header

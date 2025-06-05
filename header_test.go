@@ -60,3 +60,19 @@ func TestHeaderRoundtrip(t *testing.T) {
 		})
 	}
 }
+
+func TestCode(t *testing.T) {
+	code := Code(MethodNotAllowed)
+
+	if expected := uint8(4); code.Class() != expected {
+		t.Errorf("expected class %d, got %d", expected, code.Class())
+	}
+
+	if expected := uint8(5); code.Detail() != expected {
+		t.Errorf("expected detail %d, got %d", expected, code.Detail())
+	}
+
+	if expected := "4.05"; code.String() != expected {
+		t.Errorf("expected string %q, got %q", expected, code.String())
+	}
+}

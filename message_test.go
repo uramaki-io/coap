@@ -30,9 +30,9 @@ func TestMessageRoundtrip(t *testing.T) {
 					Token:     []byte{0x51, 0x55, 0x77, 0xe8},
 				},
 				Options: MakeOptions(
-					MustValue(MakeOption(URIPath, "Hi")),
-					MustValue(MakeOption(URIPath, "Test")),
-					MustValue(MakeOption(URIQuery, "a=1")),
+					MustMakeOption(URIPath, "Hi"),
+					MustMakeOption(URIPath, "Test"),
+					MustMakeOption(URIQuery, "a=1"),
 				),
 			},
 		},
@@ -69,7 +69,7 @@ func TestMessageRoundtrip(t *testing.T) {
 					Token:     []byte{0xD0, 0xE2, 0x4D, 0xAC},
 				},
 				Options: MakeOptions(
-					MustValue(MakeOption(MaxAge, uint32(0x424242))),
+					MustMakeOption(MaxAge, uint32(0x424242)),
 				),
 				Payload: []byte("Hello"),
 			},
@@ -111,9 +111,39 @@ func TestMessageUnmarshalError(t *testing.T) {
 		err  error
 	}{
 		{
+			name: "unknown version",
+			data: []byte{0x84, 0x45, 0x13, 0xFD, 0xD0, 0xE2, 0x4D, 0xAC},
+			err: UnmarshalError{
+				Offset: 0,
+				Cause: UnsupportedVersion{
+					Version: 2,
+				},
+			},
+		},
+		{
+			name: "unsupported token length",
+			data: []byte{0x6c, 0x45, 0x13, 0xFD, 0xD0, 0xE2, 0x4D, 0xAC, 0x4D, 0xAC},
+			err: UnmarshalError{
+				Offset: 4,
+				Cause: UnsupportedTokenLength{
+					Length: 12,
+				},
+			},
+		},
+		{
 			name: "truncated header",
+			data: []byte{0x64, 0x45},
+			err: UnmarshalError{
+				Offset: 0,
+				Cause: TruncatedError{
+					Expected: 4,
+				},
+			},
+		},
+		{
+			name: "truncated token",
 			data: []byte{0x64, 0x45, 0x13, 0xFD, 0xD0, 0xE2},
-			err: ParseError{
+			err: UnmarshalError{
 				Offset: 4,
 				Cause: TruncatedError{
 					Expected: 4,
@@ -126,7 +156,7 @@ func TestMessageUnmarshalError(t *testing.T) {
 				0x64, 0x45, 0x13, 0xFD, 0xD0, 0xE2, 0x4D, 0xAC, // Header
 				0xD3, 0x01, 0x42, // Truncated MaxAge
 			},
-			err: ParseError{
+			err: UnmarshalError{
 				Offset: 10,
 				Cause: TruncatedError{
 					Expected: 3,
@@ -138,10 +168,69 @@ func TestMessageUnmarshalError(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			msg := &Message{}
 			err := msg.UnmarshalBinary(test.data)
+
 			diff := cmp.Diff(test.err, err, cmpopts.EquateErrors())
 			if diff != "" {
 				t.Errorf("error mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestMessageMarshalError(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  *Message
+		err  error
+	}{
+		{
+			name: "unsupported version",
+			msg: &Message{
+				Header: Header{
+					Version: 2,
+				},
+			},
+			err: UnsupportedVersion{
+				Version: 2,
+			},
+		},
+		{
+			name: "unsupported token length",
+			msg: &Message{
+				Header: Header{
+					Version: ProtocolVersion,
+					Token:   bytes16,
+				},
+			},
+			err: UnsupportedTokenLength{
+				Length: 16,
+			},
+		},
+		{
+			name: "opaque option too short",
+			msg: &Message{
+				Header: Header{
+					Version: ProtocolVersion,
+				},
+				Options: MakeOptions(
+					Option{
+						OptionDef:   ETag,
+						opaqueValue: []byte{},
+					},
+				),
+			},
+			err: InvalidOptionValueLength{
+				OptionDef: ETag,
+				Length:    0,
+			},
+		},
+	}
+	for _, test := range tests {
+		_, err := test.msg.MarshalBinary()
+
+		diff := cmp.Diff(test.err, err, cmpopts.EquateErrors())
+		if diff != "" {
+			t.Errorf("error mismatch (-want +got):\n%s", diff)
+		}
 	}
 }

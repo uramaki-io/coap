@@ -17,12 +17,6 @@ func (m *Message) MarshalBinary() ([]byte, error) {
 
 // AppendBinary implements encoding.BinaryAppender
 func (m *Message) AppendBinary(data []byte) ([]byte, error) {
-	if m.Version != ProtocolVersion {
-		return data, UnsupportedVersion{
-			Version: m.Header.Version,
-		}
-	}
-
 	data, err := m.Header.AppendBinary(data)
 	if err != nil {
 		return data, err
@@ -57,7 +51,7 @@ func (m *Message) Decode(data []byte, schema *Schema) ([]byte, error) {
 	var err error
 	data, err = m.Header.Decode(data)
 	if err != nil {
-		return data, ParseError{
+		return data, UnmarshalError{
 			Offset: uint(length - len(data)),
 			Cause:  err,
 		}
@@ -65,7 +59,7 @@ func (m *Message) Decode(data []byte, schema *Schema) ([]byte, error) {
 
 	data, err = m.Options.Decode(data, schema)
 	if err != nil {
-		return data, ParseError{
+		return data, UnmarshalError{
 			Offset: uint(length - len(data)),
 			Cause:  err,
 		}

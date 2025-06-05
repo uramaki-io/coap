@@ -1,6 +1,9 @@
 package coap
 
-import "fmt"
+import (
+	"fmt"
+	"reflect"
+)
 
 type UnsupportedVersion struct {
 	Version uint8
@@ -18,7 +21,7 @@ type UnsupportedTokenLength struct {
 	Length uint
 }
 
-type ParseError struct {
+type UnmarshalError struct {
 	Offset uint
 	Cause  error
 }
@@ -36,6 +39,7 @@ type OptionNotFound struct {
 type InvalidOptionValueFormat struct {
 	OptionDef
 	Requested ValueFormat
+	Unknown   reflect.Type
 }
 
 type OptionNotRepeateable struct {
@@ -47,11 +51,11 @@ type InvalidOptionValueLength struct {
 	Length uint16
 }
 
-func (e ParseError) Error() string {
+func (e UnmarshalError) Error() string {
 	return fmt.Sprintf("parse error at offset %d: %v", e.Offset, e.Cause)
 }
 
-func (e ParseError) Unwrap() error {
+func (e UnmarshalError) Unwrap() error {
 	return e.Cause
 }
 
@@ -88,6 +92,10 @@ func (e InvalidOptionValueLength) Error() string {
 }
 
 func (e InvalidOptionValueFormat) Error() string {
+	if e.Unknown != nil {
+		return fmt.Sprintf("invalid option %q value format %q, actual %s", e.Name, e.Unknown, e.Requested)
+	}
+
 	return fmt.Sprintf("invalid option %q value format %q, actual %q", e.Name, e.Requested, e.ValueFormat)
 }
 

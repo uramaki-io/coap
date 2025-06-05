@@ -30,7 +30,7 @@ func (c Code) Detail() uint8 {
 }
 
 func (c Code) String() string {
-	return fmt.Sprintf("Code(%d.%02d)", c.Class(), c.Detail())
+	return fmt.Sprintf("%d.%02d", c.Class(), c.Detail())
 }
 
 type Type uint8
@@ -42,19 +42,20 @@ const (
 	Reset           Type = 0x03
 )
 
+var typeString = map[Type]string{
+	Confirmable:     "CON",
+	NonConfirmable:  "NON",
+	Acknowledgement: "ACK",
+	Reset:           "RST",
+}
+
 func (t Type) String() string {
-	switch t {
-	case Confirmable:
-		return "CON"
-	case NonConfirmable:
-		return "NON"
-	case Acknowledgement:
-		return "ACK"
-	case Reset:
-		return "RST"
-	default:
+	s, ok := typeString[t]
+	if !ok {
 		return fmt.Sprintf("Type(%d)", t)
 	}
+
+	return s
 }
 
 // AppendBinary implements encoding.BinaryAppender
@@ -102,13 +103,14 @@ func (h *Header) Decode(data []byte) ([]byte, error) {
 	messageID := MessageID(binary.BigEndian.Uint16(data[2:4]))
 	tkl := int(b & 0x0f)
 
+	data = data[HeaderLength:]
+
 	if tkl > TokenMaxLength {
 		return data, UnsupportedTokenLength{
 			Length: uint(tkl),
 		}
 	}
 
-	data = data[HeaderLength:]
 	if len(data) < tkl {
 		return data, TruncatedError{
 			Expected: uint(tkl),
