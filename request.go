@@ -97,7 +97,7 @@ func (r *Request) MarshalBinary() ([]byte, error) {
 // AppendBinary implements encoding.BinaryAppender
 //
 // Host, Port, Path, and Query are set in final message options.
-func (r Request) AppendBinary(data []byte) ([]byte, error) {
+func (r *Request) AppendBinary(data []byte) ([]byte, error) {
 	if r.Type != Confirmable && r.Type != NonConfirmable {
 		return data, UnsupportedType{
 			Type: r.Type,

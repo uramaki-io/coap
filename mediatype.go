@@ -45,5 +45,5 @@ func (m MediaType) String() string {
 		return fmt.Sprintf("MediaType(%d)", m.Code)
 	}
 
-	return m.String()
+	return m.Name
 }
