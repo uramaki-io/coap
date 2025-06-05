@@ -2,6 +2,8 @@ package coap
 
 import "strconv"
 
+// revive:disable:exported
+
 var (
 	IfMatch       = OptionDef{Code: 1, Name: "IfMatch", ValueFormat: ValueFormatOpaque, Repeatable: true, MaxLen: 8}
 	URIHost       = OptionDef{Code: 3, Name: "URIHost", ValueFormat: ValueFormatString, MinLen: 1, MaxLen: 255}
@@ -25,6 +27,11 @@ var (
 	NoResponse    = OptionDef{Code: 258, Name: "NoResponse", ValueFormat: ValueFormatUint, MaxLen: 1}
 )
 
+// revive:enable:exported
+
+// OptionDef defines a CoAP option with its properties.
+//
+// Option values are validated agains ValueForman and MinLen/MaxLen.
 type OptionDef struct {
 	Name        string
 	Code        uint16
@@ -34,15 +41,24 @@ type OptionDef struct {
 	MaxLen      uint16
 }
 
+// ValueFormat indicates the format of the option value.
 type ValueFormat uint8
 
 const (
-	ValueFormatEmpty  ValueFormat = 0x00
-	ValueFormatUint   ValueFormat = 0x01
+	// ValueFormatEmpty indicates an option with no value.
+	ValueFormatEmpty ValueFormat = 0x00
+
+	// ValueFormatUint indicates an option with a value that is an unsigned integer.
+	ValueFormatUint ValueFormat = 0x01
+
+	// ValueFormatOpaque indicates an option with a value that is an opaque byte sequence.
 	ValueFormatOpaque ValueFormat = 0x02
+
+	// ValueFormatString indicates an option with a value that is a UTF-8 string.
 	ValueFormatString ValueFormat = 0x03
 )
 
+// UnrecognizedOptionDef creates an OptionDef for an unrecognized option code.
 func UnrecognizedOptionDef(code uint16) OptionDef {
 	return OptionDef{
 		Code:        code,
@@ -51,6 +67,7 @@ func UnrecognizedOptionDef(code uint16) OptionDef {
 	}
 }
 
+// Recognized indicates whether the option is recognized by schema.
 func (o OptionDef) Recognized() bool {
 	return o.Name != ""
 }
@@ -60,14 +77,17 @@ func (o OptionDef) Critical() bool {
 	return o.Code&0x01 == 0x01
 }
 
+// Unsafe indicate if proxy should understand this option to forward the message.
 func (o OptionDef) Unsafe() bool {
 	return o.Code&0x02 == 0x02
 }
 
+// NoCacheKey returns true if option should not be used as cache key.
 func (o OptionDef) NoCacheKey() bool {
 	return o.Code&0x1E == 0x1c
 }
 
+// String implements fmt.Stringer.
 func (o OptionDef) String() string {
 	return o.Name
 }
@@ -79,6 +99,9 @@ var valueFormatString = map[ValueFormat]string{
 	ValueFormatString: "string",
 }
 
+// String implements fmt.Stringer for ValueFormat.
+//
+// Panic if ValueFormat is unknown.
 func (f ValueFormat) String() string {
 	s, ok := valueFormatString[f]
 	if !ok {

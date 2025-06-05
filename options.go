@@ -7,10 +7,14 @@ import (
 	"slices"
 )
 
+// Options represents a collection of CoAP options.
 type Options struct {
 	data []Option
 }
 
+// MakeOptions creates a new Options instance with the provided options.
+//
+// The options are sorted by their code.
 func MakeOptions(data ...Option) Options {
 	slices.SortFunc(data, func(a, b Option) int {
 		return cmp.Compare(a.Code, b.Code)
@@ -116,7 +120,8 @@ func (o *Options) SetValue(def OptionDef, value any) error {
 
 // GetUint retrieves the value of the first option matching the definition as uint32.
 //
-// Returns OptionNotFound if the option is not present, or InvalidOptionValueFormat if the option value format is not ValueFormatUint.
+// Returns OptionNotFound if the option is not present
+// Returns InvalidOptionValueFormat if the option value format is not ValueFormatUint.
 func (o Options) GetUint(def OptionDef) (uint32, error) {
 	opt, ok := o.Get(def)
 	if !ok {
@@ -131,6 +136,7 @@ func (o Options) GetUint(def OptionDef) (uint32, error) {
 // SetUint creates or updates an option with the given value as uint32.
 //
 // Returns InvalidOptionValueFormat if the option value format is not ValueFormatUint.
+// Returns InvalidOptionValueLength if the option value length does not match the expected length.
 func (o *Options) SetUint(def OptionDef, value uint32) error {
 	opt := Option{
 		OptionDef: def,
@@ -439,6 +445,7 @@ func (o *Options) setAll(def OptionDef, options iter.Seq[Option]) error {
 	return nil
 }
 
+// Index returns index of first option with matching code in the options slice returning -1 if not found.
 func Index(options []Option, def OptionDef) int {
 	return slices.IndexFunc(options, func(opt Option) bool {
 		return opt.Code == def.Code

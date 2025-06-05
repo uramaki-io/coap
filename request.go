@@ -99,14 +99,14 @@ func (r *Request) MarshalBinary() ([]byte, error) {
 // Host, Port, Path, and Query are set in final message options.
 func (r *Request) AppendBinary(data []byte) ([]byte, error) {
 	if r.Type != Confirmable && r.Type != NonConfirmable {
-		return data, UnsupportedType{
+		return data, InvalidType{
 			Type: r.Type,
 		}
 	}
 
 	code := Code(r.Method)
 	if r.Method == 0 || code.Class() != 0 {
-		return data, UnsupportedCode{
+		return data, InvalidCode{
 			Code: code,
 		}
 	}
@@ -164,13 +164,13 @@ func (r *Request) Decode(data []byte, schema *Schema) ([]byte, error) {
 	}
 
 	if msg.Type != Confirmable && msg.Type != NonConfirmable {
-		return data, UnsupportedType{
+		return data, InvalidType{
 			Type: r.Type,
 		}
 	}
 
 	if msg.Code.Class() != 0 {
-		return data, UnsupportedCode{
+		return data, InvalidCode{
 			Code: msg.Code,
 		}
 	}

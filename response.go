@@ -95,14 +95,14 @@ const (
 // AppendBinary implements encoding.BinaryAppender.
 func (r *Response) AppendBinary(data []byte) ([]byte, error) {
 	if r.Type > Reset {
-		return data, UnsupportedType{
+		return data, InvalidType{
 			Type: r.Type,
 		}
 	}
 
 	code := Code(r.Code)
 	if code.Class() < 0x01 || code.Class() > 0x10 {
-		return data, UnsupportedCode{
+		return data, InvalidCode{
 			Code: code,
 		}
 	}

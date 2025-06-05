@@ -5,47 +5,71 @@ import (
 	"reflect"
 )
 
+// UnsupportedVersion is returned when the version does not match the expected protocol version 1.
+//
+// https://datatracker.ietf.org/doc/html/rfc7252#section-3
 type UnsupportedVersion struct {
 	Version uint8
 }
 
-type UnsupportedType struct {
+// InvalidType is returned when the message type is outside the specified range of 0-4.
+//
+// https://datatracker.ietf.org/doc/html/rfc7252#section-3
+type InvalidType struct {
 	Type Type
 }
 
-type UnsupportedCode struct {
+// InvalidCode is returned when the code does not match the request/response type.
+type InvalidCode struct {
 	Code Code
 }
 
+// UnsupportedTokenLength is returned when the token length exceeds the maximum allowed length of 8 bytes.
+//
+// https://datatracker.ietf.org/doc/html/rfc7252#section-3
 type UnsupportedTokenLength struct {
 	Length uint
 }
 
+// UnmarshalError is returned when an error occurs during unmarshaling a message.
 type UnmarshalError struct {
+	// Offset indicates where the error occurred in the input data.
 	Offset uint
-	Cause  error
+
+	// Cause is the underlying error that caused the unmarshaling to fail.
+	Cause error
 }
 
+// TruncatedError is returned when the input data does not contain enough bytes.
 type TruncatedError struct {
 	Expected uint
 }
 
+// UnsupportedExtendError is returned when an unsupported extend value 15 is encountered.
+//
+// https://datatracker.ietf.org/doc/html/rfc7252#section-3.1
 type UnsupportedExtendError struct{}
 
+// OptionNotFound is returned when a requested option is not found in the message options.
 type OptionNotFound struct {
 	OptionDef
 }
 
+// InvalidOptionValueFormat is returned when the value format of an option does not match the requested format.
 type InvalidOptionValueFormat struct {
 	OptionDef
 	Requested ValueFormat
 	Unknown   reflect.Type
 }
 
+// OptionNotRepeateable is returned when an option that is not allowed to be repeated is found more than once in the message options.
+//
+// https://datatracker.ietf.org/doc/html/rfc7252#section-5.4.1
 type OptionNotRepeateable struct {
 	OptionDef
 }
 
+// InvalidOptionValueLength is returned when the length of an option value does not match the expected length.
 type InvalidOptionValueLength struct {
 	OptionDef
 	Length uint16
@@ -63,12 +87,12 @@ func (e UnsupportedVersion) Error() string {
 	return fmt.Sprintf("unsupported version %d, expected %d", e.Version, ProtocolVersion)
 }
 
-func (e UnsupportedType) Error() string {
-	return fmt.Sprintf("unsupported type %s", e.Type)
+func (e InvalidType) Error() string {
+	return fmt.Sprintf("invalid type %s", e.Type)
 }
 
-func (e UnsupportedCode) Error() string {
-	return fmt.Sprintf("unsupported code %s", e.Code)
+func (e InvalidCode) Error() string {
+	return fmt.Sprintf("invalid code %s", e.Code)
 }
 
 func (e UnsupportedTokenLength) Error() string {

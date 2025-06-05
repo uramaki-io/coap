@@ -9,28 +9,42 @@ import (
 )
 
 const (
-	ExtendByte    = uint8(0x0D) // 13
-	ExtendDword   = uint8(0x0E) // 14
+	// ExtendByte indicates that next header byte is an extended delta or length value.
+	ExtendByte = uint8(0x0D) // 13
+
+	// ExtendDword indicates that next two header bytes are an extended delta or length value.
+	ExtendDword = uint8(0x0E) // 14
+
+	// ExtendInvalid indicates that the extended value is invalid.
 	ExtendInvalid = uint8(0x0F) // 15
 
-	ExtendByteOffset  = uint16(ExtendByte)               // 13
+	// ExtendByteOffset is the offset for extended byte values.
+	ExtendByteOffset = uint16(ExtendByte) // 13
+
+	// ExtendDwordOffset is the offset for extended dword values.
 	ExtendDwordOffset = uint16(256) + uint16(ExtendByte) // 269
 )
 
+// Option represents a CoAP option, which includes its definition and uint/opaque/string value.
 type Option struct {
 	OptionDef
+
+	// Length indicates encoded length of the option value.
+	Length uint16
 
 	uintValue   uint32
 	opaqueValue []byte
 	stringValue string
 }
 
+// Must panics if the provided error is not nil.
 func Must(err error) {
 	if err != nil {
 		panic(err)
 	}
 }
 
+// MustValue returns the value if err is nil, otherwise it panics with the error.
 func MustValue[T any](value T, err error) T {
 	if err != nil {
 		panic(err)
@@ -39,6 +53,7 @@ func MustValue[T any](value T, err error) T {
 	return value
 }
 
+// MustMakeOption creates an Option from the provided definition and value, panicking if an error occurs.
 func MustMakeOption(def OptionDef, value any) Option {
 	opt, err := MakeOption(def, value)
 	if err != nil {
@@ -48,6 +63,9 @@ func MustMakeOption(def OptionDef, value any) Option {
 	return opt
 }
 
+// MakeOption creates an Option from the provided definition and value.
+//
+// Returns an error if the value does not match the expected format or length defined in OptionDef.
 func MakeOption(def OptionDef, value any) (Option, error) {
 	opt := Option{
 		OptionDef: def,
@@ -61,6 +79,9 @@ func MakeOption(def OptionDef, value any) (Option, error) {
 	return opt, nil
 }
 
+// String returns a string representation of the Option, including its name and value.
+//
+// If the name is empty it uses the code as a string representation.
 func (o Option) String() string {
 	name := o.Name
 	if name == "" {
@@ -79,6 +100,10 @@ func (o Option) String() string {
 	}
 }
 
+// GetValue returns the value of the option based on its ValueFormat.
+//
+// Prefer using specific getter methods like GetUint, GetOpaque, or GetString to ensure type safety and avoid reflect overhead.
+// Returns nil if the value format is not recognized.
 func (o Option) GetValue() any {
 	switch o.ValueFormat {
 	case ValueFormatUint:
@@ -92,6 +117,10 @@ func (o Option) GetValue() any {
 	}
 }
 
+// SetValue sets the value of the option based on its ValueFormat.
+//
+// Prefer using specific setter methods like SetUint, SetOpaque, or SetString to ensure type safety and avoid reflect overhead.
+// Returns an error if the value does not match the expected format or length defined in OptionDef.
 func (o *Option) SetValue(value any) error {
 	switch v := value.(type) {
 	case uint32:
@@ -108,6 +137,9 @@ func (o *Option) SetValue(value any) error {
 	}
 }
 
+// GetUint returns the uint32 value of the option.
+//
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatUint.
 func (o Option) GetUint() (uint32, error) {
 	if o.ValueFormat != ValueFormatUint {
 		return 0, InvalidOptionValueFormat{
@@ -119,6 +151,10 @@ func (o Option) GetUint() (uint32, error) {
 	return o.uintValue, nil
 }
 
+// SetUint sets the uint32 value of the option.
+//
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatUint.
+// Returns InvalidOptionValueLength if the value length does not match the expected length.
 func (o *Option) SetUint(value uint32) error {
 	if o.ValueFormat != ValueFormatUint {
 		return InvalidOptionValueFormat{
@@ -140,6 +176,9 @@ func (o *Option) SetUint(value uint32) error {
 	return nil
 }
 
+// GetOpaque returns the opaque byte slice value of the option.
+//
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatOpaque.
 func (o Option) GetOpaque() ([]byte, error) {
 	if o.ValueFormat != ValueFormatOpaque {
 		return nil, InvalidOptionValueFormat{
@@ -151,6 +190,10 @@ func (o Option) GetOpaque() ([]byte, error) {
 	return o.opaqueValue, nil
 }
 
+// SetOpaque sets the opaque byte slice value of the option.
+//
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatOpaque.
+// Returns InvalidOptionValueLength if the value length does not match the expected length.
 func (o *Option) SetOpaque(value []byte) error {
 	if o.ValueFormat != ValueFormatOpaque {
 		return InvalidOptionValueFormat{
@@ -172,6 +215,9 @@ func (o *Option) SetOpaque(value []byte) error {
 	return nil
 }
 
+// GetString returns the string value of the option.
+//
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatString.
 func (o Option) GetString() (string, error) {
 	if o.ValueFormat != ValueFormatString {
 		return "", InvalidOptionValueFormat{
@@ -183,6 +229,10 @@ func (o Option) GetString() (string, error) {
 	return string(o.stringValue), nil
 }
 
+// SetString sets the string value of the option.
+//
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatString.
+// Returns InvalidOptionValueLength if the value length does not match the expected length.
 func (o *Option) SetString(value string) error {
 	if o.ValueFormat != ValueFormatString {
 		return InvalidOptionValueFormat{
@@ -254,6 +304,11 @@ func (o Option) Encode(data []byte, prev uint16) ([]byte, error) {
 	return data, nil
 }
 
+// Decode decodes the option from the provided data slice, using the previous option code and schema.
+//
+// Returns the remaining data after decoding and any error encountered during decoding.
+// Returns TruncatedError if the data is too short to decode the option.
+// Returns InvalidOptionValueLength if the decoded length does not match the expected length defined in OptionDef.
 func (o *Option) Decode(data []byte, prev uint16, schema *Schema) ([]byte, error) {
 	if schema == nil {
 		panic("schema must not be nil")
