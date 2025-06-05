@@ -1,7 +1,10 @@
 package coap
 
+import "slices"
+
 const PayloadMarker = 0xFF
 
+// Message represents a CoAP message, which includes a header, options, and an optional payload.
 type Message struct {
 	Header
 	Options
@@ -67,7 +70,7 @@ func (m *Message) Decode(data []byte, schema *Schema) ([]byte, error) {
 
 	// payload exists if marker was present when decoding options
 	if len(data) > 1 {
-		m.Payload = data[1:]
+		m.Payload = slices.Clone(data[1:])
 		data = data[len(data):]
 	}
 

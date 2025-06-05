@@ -2,6 +2,7 @@ package coap
 
 import "fmt"
 
+// Response represents a CoAP response message.
 type Response struct {
 	Type      Type
 	Status    Status

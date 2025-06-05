@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 )
 
@@ -346,7 +347,7 @@ func (o *Option) Decode(data []byte, prev uint16, schema *Schema) ([]byte, error
 	// decode value
 	switch o.ValueFormat {
 	case ValueFormatOpaque:
-		o.opaqueValue = data[:length]
+		o.opaqueValue = slices.Clone(data[:length])
 	case ValueFormatString:
 		o.stringValue = string(data[:length])
 	case ValueFormatUint:

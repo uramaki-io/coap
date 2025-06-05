@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// Request represents a CoAP request message.
 type Request struct {
 	Type      Type
 	Method    Method
@@ -68,7 +69,9 @@ func (r *Request) MarshalBinary() ([]byte, error) {
 }
 
 // AppendBinary implements encoding.BinaryAppender
-func (r *Request) AppendBinary(data []byte) ([]byte, error) {
+//
+// Host, Port, Path, and Query are set in final message options.
+func (r Request) AppendBinary(data []byte) ([]byte, error) {
 	if r.Type != Confirmable && r.Type != NonConfirmable {
 		return data, UnsupportedType{
 			Type: r.Type,
@@ -82,20 +85,22 @@ func (r *Request) AppendBinary(data []byte) ([]byte, error) {
 		}
 	}
 
+	options := r.Options.Clone()
+
 	if r.Host != "" {
-		Must(r.Options.SetString(URIHost, r.Host))
+		Must(options.SetString(URIHost, r.Host))
 	}
 
 	if r.Port != 0 {
-		Must(r.Options.SetUint(URIPort, uint32(r.Port)))
+		Must(options.SetUint(URIPort, uint32(r.Port)))
 	}
 
 	if r.Path != "" {
-		Must(r.Options.SetAllString(URIPath, EncodePath(r.Path)))
+		Must(options.SetAllString(URIPath, EncodePath(r.Path)))
 	}
 
 	if len(r.Query) != 0 {
-		Must(r.Options.SetAllString(URIQuery, slices.Values(r.Query)))
+		Must(options.SetAllString(URIQuery, slices.Values(r.Query)))
 	}
 
 	msg := Message{
@@ -106,7 +111,7 @@ func (r *Request) AppendBinary(data []byte) ([]byte, error) {
 			MessageID: r.MessageID,
 			Token:     r.Token,
 		},
-		Options: r.Options,
+		Options: options,
 		Payload: r.Payload,
 	}
 

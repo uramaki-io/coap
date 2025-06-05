@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"slices"
 	"sync/atomic"
 )
 
@@ -130,7 +131,7 @@ func (h *Header) Decode(data []byte) ([]byte, error) {
 	h.Type = tpe
 	h.Code = code
 	h.MessageID = messageID
-	h.Token = Token(data[:tkl])
+	h.Token = Token(slices.Clone(data[:tkl]))
 
 	return data[tkl:], nil
 }

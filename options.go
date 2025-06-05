@@ -21,6 +21,12 @@ func MakeOptions(data ...Option) Options {
 	}
 }
 
+func (o Options) Clone() Options {
+	return Options{
+		data: slices.Clone(o.data),
+	}
+}
+
 func (o Options) Contains(def OptionDef) bool {
 	i := Index(o.data, def)
 	return i != -1
