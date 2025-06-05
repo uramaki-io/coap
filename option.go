@@ -29,9 +29,6 @@ const (
 type Option struct {
 	OptionDef
 
-	// Length indicates encoded length of the option value.
-	Length uint16
-
 	uintValue   uint32
 	opaqueValue []byte
 	stringValue string
@@ -134,6 +131,21 @@ func (o *Option) SetValue(value any) error {
 			OptionDef: o.OptionDef,
 			Unknown:   reflect.TypeOf(value),
 		}
+	}
+}
+
+// GetLength returns the encoded length of the option value.
+func (o Option) GetLength() uint16 {
+	// determine value length
+	switch o.ValueFormat {
+	case ValueFormatUint:
+		return Len32(o.uintValue)
+	case ValueFormatOpaque:
+		return uint16(len(o.opaqueValue))
+	case ValueFormatString:
+		return uint16(len(o.stringValue))
+	default:
+		return 0
 	}
 }
 
@@ -256,34 +268,17 @@ func (o *Option) SetString(value string) error {
 
 // Encode appends the encoded option to the provided data slice.
 func (o Option) Encode(data []byte, prev uint16) ([]byte, error) {
-	// determine value length
-	length := uint16(0)
-	switch o.ValueFormat {
-	case ValueFormatUint:
-		length = Len32(o.uintValue)
-	case ValueFormatOpaque:
-		length = uint16(len(o.opaqueValue))
-	case ValueFormatString:
-		length = uint16(len(o.stringValue))
-	}
-
-	if length < o.MinLen || length > o.MaxLen {
-		return data, InvalidOptionValueLength{
-			OptionDef: o.OptionDef,
-			Length:    length,
-		}
-	}
-
 	// reserve space for delta/length header
 	header := len(data)
 	data = append(data, 0)
 
 	// encode delta
 	delta := uint16(o.Code - prev)
-	hd, data := encodeExtend(data, delta)
+	hd, data := EncodeExtend(data, delta)
 
 	// encode length
-	hl, data := encodeExtend(data, length)
+	length := o.GetLength()
+	hl, data := EncodeExtend(data, length)
 
 	// set delta/length header
 	data[header] = hd<<4 | hl
@@ -326,14 +321,14 @@ func (o *Option) Decode(data []byte, prev uint16, schema *Schema) ([]byte, error
 	// decode delta
 	var delta uint16
 	var err error
-	delta, data, err = decodeExtend(data, header>>4)
+	delta, data, err = DecodeExtend(data, header>>4)
 	if err != nil {
 		return data, err
 	}
 
 	// decode length
 	var length uint16
-	length, data, err = decodeExtend(data, header&0x0F)
+	length, data, err = DecodeExtend(data, header&0x0F)
 	if err != nil {
 		return data, err
 	}
@@ -418,7 +413,10 @@ func Decode32(data []byte) uint32 {
 	}
 }
 
-func encodeExtend(data []byte, v uint16) (uint8, []byte) {
+// EncodeExtend encodes a uint16 value as an extended delta or length value in the CoAP header format.
+//
+// Returns the encoded header byte and the updated data slice.
+func EncodeExtend(data []byte, v uint16) (uint8, []byte) {
 	switch {
 	case v < ExtendByteOffset:
 		return uint8(v), data
@@ -431,7 +429,10 @@ func encodeExtend(data []byte, v uint16) (uint8, []byte) {
 	}
 }
 
-func decodeExtend(data []byte, v uint8) (uint16, []byte, error) {
+// DecodeExtend decodes an extended delta or length value from the CoAP header format.
+//
+// Returns the decoded value, the remaining data slice, and an error if any.
+func DecodeExtend(data []byte, v uint8) (uint16, []byte, error) {
 	switch v {
 	case ExtendByte:
 		if len(data) < 1 {

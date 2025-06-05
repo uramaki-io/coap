@@ -135,8 +135,8 @@ func (o Options) GetUint(def OptionDef) (uint32, error) {
 
 // SetUint creates or updates an option with the given value as uint32.
 //
-// Returns InvalidOptionValueFormat if the option value format is not ValueFormatUint.
-// Returns InvalidOptionValueLength if the option value length does not match the expected length.
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatUint.
+// Returns InvalidOptionValueLength if the value length does not match the expected length.
 func (o *Options) SetUint(def OptionDef, value uint32) error {
 	opt := Option{
 		OptionDef: def,
@@ -154,7 +154,7 @@ func (o *Options) SetUint(def OptionDef, value uint32) error {
 
 // GetAllUint retrieves all options matching the definition as a sequence of uint32 values.
 //
-// Returns InvalidOptionValueFormat if the option value format is not ValueFormatUint.
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatUint.
 func (o Options) GetAllUint(def OptionDef) (iter.Seq[uint32], error) {
 	if def.ValueFormat != ValueFormatUint {
 		return nil, InvalidOptionValueFormat{
@@ -174,7 +174,8 @@ func (o Options) GetAllUint(def OptionDef) (iter.Seq[uint32], error) {
 
 // SetAllUint creates or updates all options matching the definition with the given sequence of uint32 values.
 //
-// Returns InvalidOptionValueFormat if the option value format is not ValueFormatUint.
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatUint.
+// Returns InvalidOptionValueLength if the value length does not match the expected length.
 func (o *Options) SetAllUint(def OptionDef, values iter.Seq[uint32]) error {
 	if def.ValueFormat != ValueFormatUint {
 		return InvalidOptionValueFormat{
@@ -198,7 +199,8 @@ func (o *Options) SetAllUint(def OptionDef, values iter.Seq[uint32]) error {
 
 // GetOpaque retrieves the value of the first option matching the definition as []byte.
 //
-// Returns OptionNotFound if the option is not present, or InvalidOptionValueFormat if the option value format is not ValueFormatOpaque.
+// Returns OptionNotFound if the option is not present
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatOpaque.
 func (o Options) GetOpaque(def OptionDef) ([]byte, error) {
 	opt, ok := o.Get(def)
 	if !ok {
@@ -212,7 +214,8 @@ func (o Options) GetOpaque(def OptionDef) ([]byte, error) {
 
 // SetOpaque creates or updates an option with the given value as []byte.
 //
-// Returns InvalidOptionValueFormat if the option value format is not ValueFormatOpaque.
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatOpaque.
+// Returns InvalidOptionValueLength if the value length does not match the expected length.
 func (o *Options) SetOpaque(def OptionDef, value []byte) error {
 	opt := Option{
 		OptionDef: def,
@@ -230,7 +233,7 @@ func (o *Options) SetOpaque(def OptionDef, value []byte) error {
 
 // GetAllOpaque retrieves all options matching the definition as a sequence of []byte values.
 //
-// Returns InvalidOptionValueFormat if the option value format is not ValueFormatOpaque.
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatOpaque.
 func (o Options) GetAllOpaque(def OptionDef) (iter.Seq[[]byte], error) {
 	if def.ValueFormat != ValueFormatOpaque {
 		return nil, InvalidOptionValueFormat{
@@ -250,7 +253,8 @@ func (o Options) GetAllOpaque(def OptionDef) (iter.Seq[[]byte], error) {
 
 // SetAllOpaque creates or updates all options matching the definition with the given sequence of []byte values.
 //
-// Returns InvalidOptionValueFormat if the option value format is not ValueFormatOpaque.
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatOpaque.
+// Returns InvalidOptionValueLength if the value length does not match the expected length.
 func (o *Options) SetAllOpaque(def OptionDef, values iter.Seq[[]byte]) error {
 	if def.ValueFormat != ValueFormatOpaque {
 		return InvalidOptionValueFormat{
@@ -274,7 +278,8 @@ func (o *Options) SetAllOpaque(def OptionDef, values iter.Seq[[]byte]) error {
 
 // GetString retrieves the value of the first option matching the definition as string.
 //
-// Returns OptionNotFound if the option is not present, or InvalidOptionValueFormat if the option value format is not ValueFormatString.
+// Returns OptionNotFound if the option is not present
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatString.
 func (o Options) GetString(def OptionDef) (string, error) {
 	opt, ok := o.Get(def)
 	if !ok {
@@ -288,7 +293,7 @@ func (o Options) GetString(def OptionDef) (string, error) {
 
 // SetString creates or updates an option with the given value as string.
 //
-// Returns InvalidOptionValueFormat if the option value format is not ValueFormatString.
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatString.
 func (o *Options) SetString(def OptionDef, value string) error {
 	opt := Option{
 		OptionDef: def,
@@ -306,7 +311,8 @@ func (o *Options) SetString(def OptionDef, value string) error {
 
 // GetAllString retrieves all options matching the definition as a sequence of string values.
 //
-// Returns InvalidOptionValueFormat if the option value format is not ValueFormatString.
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatString.
+// Returns InvalidOptionValueLength if the value length does not match the expected length.
 func (o Options) GetAllString(def OptionDef) (iter.Seq[string], error) {
 	if def.ValueFormat != ValueFormatString {
 		return nil, InvalidOptionValueFormat{
@@ -326,7 +332,7 @@ func (o Options) GetAllString(def OptionDef) (iter.Seq[string], error) {
 
 // SetAllString creates or updates all options matching the definition with the given sequence of string values.
 //
-// Returns InvalidOptionValueFormat if the option value format is not ValueFormatString.
+// Returns InvalidOptionValueFormat if the value format is not ValueFormatString.
 func (o *Options) SetAllString(def OptionDef, values iter.Seq[string]) error {
 	if def.ValueFormat != ValueFormatString {
 		return InvalidOptionValueFormat{
@@ -434,6 +440,14 @@ func (o *Options) setAll(def OptionDef, options iter.Seq[Option]) error {
 		loc := Index(o.data[i:], def)
 		if loc == -1 {
 			break
+		}
+
+		length := opt.GetLength()
+		if length < def.MinLen || length > def.MaxLen {
+			return InvalidOptionValueLength{
+				OptionDef: def,
+				Length:    length,
+			}
 		}
 
 		i += loc
