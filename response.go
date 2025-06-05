@@ -37,12 +37,13 @@ type Response struct {
 	Payload []byte
 }
 
-// ResponseCode represents a CoAP response code.
+// ResponseCode represents a CoAP response message code.
 //
 // https://datatracker.ietf.org/doc/html/rfc7252#section-5.9
 type ResponseCode uint8
 
 // Success 2.xx Response Codes
+//
 // https://datatracker.ietf.org/doc/html/rfc7252#section-5.9.1
 const (
 	Created  ResponseCode = 0x41
@@ -62,6 +63,7 @@ func (c ResponseCode) String() string {
 }
 
 // Client Error 4.xx Response Codes
+//
 // https://datatracker.ietf.org/doc/html/rfc7252#section-5.9.2
 const (
 	BadRequest               ResponseCode = 0x80

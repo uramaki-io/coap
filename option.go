@@ -136,7 +136,6 @@ func (o *Option) SetValue(value any) error {
 
 // GetLength returns the encoded length of the option value.
 func (o Option) GetLength() uint16 {
-	// determine value length
 	switch o.ValueFormat {
 	case ValueFormatUint:
 		return Len32(o.uintValue)

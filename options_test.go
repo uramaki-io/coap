@@ -92,10 +92,12 @@ func TestOptionsGetSet(t *testing.T) {
 func EquateOptions() cmp.Option {
 	return cmp.Options{
 		cmp.Transformer("Options", func(o Options) []string {
-			var opts []string
-			for _, opt := range o.data {
+			data := SortOptions(o.data)
+			opts := make([]string, 0, len(data))
+			for _, opt := range data {
 				opts = append(opts, opt.String())
 			}
+
 			return opts
 		}),
 		cmpopts.IgnoreUnexported(Options{}),

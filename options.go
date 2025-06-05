@@ -2,7 +2,6 @@ package coap
 
 import (
 	"cmp"
-	"fmt"
 	"iter"
 	"slices"
 )
@@ -12,14 +11,20 @@ type Options struct {
 	data []Option
 }
 
-// MakeOptions creates a new Options instance with the provided options.
+// SortOptions sorts the options by their code in ascending order.
 //
-// The options are sorted by their code.
-func MakeOptions(data ...Option) Options {
-	slices.SortFunc(data, func(a, b Option) int {
-		return cmp.Compare(a.Code, b.Code)
+// Returns a new slice of options sorted by code.
+func SortOptions(options []Option) []Option {
+	options = slices.Clone(options)
+	slices.SortFunc(options, func(l, r Option) int {
+		return cmp.Compare(l.Code, r.Code)
 	})
 
+	return options
+}
+
+// MakeOptions creates a new Options instance with the provided options.
+func MakeOptions(data ...Option) Options {
 	return Options{
 		data: data,
 	}
@@ -354,25 +359,21 @@ func (o *Options) SetAllString(def OptionDef, values iter.Seq[string]) error {
 	})
 }
 
-// AppendBinary implements encoding.BinaryAppender
+// AppendBinary encodes options into the data slice.
 //
-// It encodes options into the data slice, sorting them by code before encoding.
+// If there are no options to encode, it returns the data slice unchanged.
 func (o Options) AppendBinary(data []byte) ([]byte, error) {
 	if len(o.data) == 0 {
 		return data, nil // no options to encode
 	}
 
-	options := slices.Clone(o.data)
-	slices.SortFunc(options, func(l, r Option) int {
-		return cmp.Compare(l.Code, r.Code)
-	})
-
+	options := SortOptions(o.data)
 	prev := uint16(0)
 	for _, opt := range options {
 		var err error
 		data, err = opt.Encode(data, prev)
 		if err != nil {
-			return data, fmt.Errorf("encode option %q: %w", opt.OptionDef.Name, err)
+			return data, err
 		}
 
 		prev = opt.Code
@@ -381,10 +382,12 @@ func (o Options) AppendBinary(data []byte) ([]byte, error) {
 	return data, nil
 }
 
-// Decode deserializes options from data using schema.
+// Decode decodes options from data using schema.
 //
-// If schema is nil, it panics.
+// Panics if schema is nil.
 // Returns the remaining data after options have been decoded.
+// Returns TruncatedError if the data is too short to decode the option.
+// Returns InvalidOptionValueLength if the decoded length does not match the expected length defined in OptionDef.
 //
 // Multiple occurrences of non-repeatable options are treated as unrecognized options.
 // Unrecognized options are silently ignored if they are elective.
