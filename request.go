@@ -146,7 +146,7 @@ func (r *Request) AppendBinary(data []byte) ([]byte, error) {
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler
 func (r *Request) UnmarshalBinary(data []byte) error {
-	_, err := r.Decode(data, DefaultSchema)
+	_, err := r.Decode(data, DecodeOptions{})
 	return err
 }
 
@@ -155,14 +155,10 @@ func (r *Request) UnmarshalBinary(data []byte) error {
 // Returns UnsupportedType error if the message type is not Confirmable or NonConfirmable.
 //
 // Returns UnsupportedCode error if the message code is not a valid request method (0.xx).
-func (r *Request) Decode(data []byte, schema *Schema) ([]byte, error) {
-	if schema == nil {
-		schema = DefaultSchema
-	}
-
+func (r *Request) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
 	msg := Message{}
 
-	data, err := msg.Decode(data, schema)
+	data, err := msg.Decode(data, opts)
 	if err != nil {
 		return data, err
 	}

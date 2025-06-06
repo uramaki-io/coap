@@ -377,17 +377,23 @@ func (o Options) Encode(data []byte) []byte {
 //
 // Multiple occurrences of non-repeatable options are treated as unrecognized options.
 // Unrecognized options are silently ignored if they are elective.
-func (o *Options) Decode(data []byte, schema *Schema) ([]byte, error) {
-	if schema == nil {
-		schema = DefaultSchema
+func (o *Options) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
+	if opts.MaxOptions == 0 {
+		opts.MaxOptions = MaxOptions
 	}
 
 	prev := uint16(0)
 	options := []Option{}
 	for len(data) > 0 && data[0] != PayloadMarker {
+		if len(options) >= int(opts.MaxOptions) {
+			return data, TooManyOptions{
+				Limit: opts.MaxOptions,
+			}
+		}
+
 		var err error
 		var option Option
-		data, err = option.Decode(data, prev, schema)
+		data, err = option.Decode(data, prev, opts)
 		if err != nil {
 			return data, err
 		}
@@ -431,7 +437,7 @@ func (o *Options) setAll(def OptionDef, options iter.Seq[Option]) error {
 			break
 		}
 
-		length := opt.GetLength()
+		length := opt.Length()
 		if length < def.MinLen || length > def.MaxLen {
 			return InvalidOptionValueLength{
 				OptionDef: def,

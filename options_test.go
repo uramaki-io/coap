@@ -16,17 +16,17 @@ func TestOptionsGetSet(t *testing.T) {
 		value  any
 	}{
 		{
-			name:   "string option",
+			name:   "string",
 			option: URIHost,
 			value:  "example.com",
 		},
 		{
-			name:   "uint option",
+			name:   "uint",
 			option: URIPort,
 			value:  uint32(0x4242),
 		},
 		{
-			name:   "opaque option",
+			name:   "opaque",
 			option: IfMatch,
 			value:  bytes4,
 		},

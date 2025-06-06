@@ -143,8 +143,8 @@ func (o *Option) SetValue(value any) error {
 	}
 }
 
-// GetLength returns the encoded length of the option value.
-func (o Option) GetLength() uint16 {
+// Length returns the encoded length of the option value.
+func (o Option) Length() uint16 {
 	switch o.ValueFormat {
 	case ValueFormatUint:
 		return Len32(o.uintValue)
@@ -288,7 +288,7 @@ func (o Option) Encode(data []byte, prev uint16) []byte {
 	hd, data := EncodeExtend(data, delta)
 
 	// encode length
-	length := o.GetLength()
+	length := o.Length()
 	hl, data := EncodeExtend(data, length)
 
 	// set delta/length header
@@ -317,9 +317,13 @@ func (o Option) Encode(data []byte, prev uint16) []byte {
 // Returns TruncatedError if the data is too short to decode the option.
 //
 // Returns InvalidOptionValueLength if the decoded length does not match the expected length.
-func (o *Option) Decode(data []byte, prev uint16, schema *Schema) ([]byte, error) {
-	if schema == nil {
-		schema = DefaultSchema
+func (o *Option) Decode(data []byte, prev uint16, opts DecodeOptions) ([]byte, error) {
+	if opts.Schema == nil {
+		opts.Schema = DefaultSchema
+	}
+
+	if opts.MaxOptionLength == 0 {
+		opts.MaxOptionLength = MaxOptionLength
 	}
 
 	if len(data) == 0 {
@@ -348,9 +352,10 @@ func (o *Option) Decode(data []byte, prev uint16, schema *Schema) ([]byte, error
 
 	// lookup option definition
 	code := prev + delta
-	o.OptionDef = schema.Option(code)
+	o.OptionDef = opts.Schema.Option(code)
 
 	// check length against option definition
+	o.MaxLen = min(o.OptionDef.MaxLen, opts.MaxOptionLength)
 	switch {
 	case len(data) < int(length):
 		return data, TruncatedError{

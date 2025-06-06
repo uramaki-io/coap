@@ -7,6 +7,53 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
+func FuzzMessageDecode(f *testing.F) {
+	f.Add([]byte{0x44, 0x01, 0x84, 0x9e, 0x51, 0x55, 0x77, 0xe8}) // Valid header
+	f.Add([]byte{0x70, 0xa0, 0x42, 0x42})                         // Reset header
+	f.Add([]byte{0x44, 0x01, 0x00, 0x01, 0xD0, 0xE2, 0x4D})       // Truncated header
+
+	// ensure values are within valid ranges and there is no panic
+	f.Fuzz(func(t *testing.T, data []byte) {
+		msg := Message{}
+		opts := DecodeOptions{
+			MaxPayloadLength: 16,
+		}
+		_, err := msg.Decode(data, opts)
+		if err != nil {
+			t.SkipNow()
+		}
+
+		// 2 bits
+		if msg.Version > 1 {
+			t.Errorf("invalid version %d", msg.Version)
+		}
+
+		// 2 bits
+		if msg.Type > 3 {
+			t.Errorf("invalid type %d", msg.Type)
+		}
+
+		// 5 bits
+		if len(msg.Token) > 8 {
+			t.Errorf("token length %d exceeds maximum of 8 bytes", len(msg.Token))
+		}
+
+		if len(msg.Payload) > int(opts.MaxPayloadLength) {
+			t.Errorf("payload length exceeds maximum of %d bytes", opts.MaxPayloadLength)
+		}
+
+		for _, opt := range msg.Options {
+			if opt.Length() > MaxOptionLength {
+				t.Errorf("option value length %d exceeds maximum of %d bytes", opt.Length(), MaxOptionLength)
+			}
+		}
+
+		if len(msg.Options) > MaxOptions {
+			t.Errorf("number of options %d exceeds maximum of %d", len(msg.Options), MaxOptions)
+		}
+	})
+}
+
 func TestMessageRoundtrip(t *testing.T) {
 	tests := []struct {
 		name string

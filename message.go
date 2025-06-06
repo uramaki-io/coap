@@ -2,8 +2,22 @@ package coap
 
 import "slices"
 
-// PayloadMarker is the marker byte that indicates the presence of a payload in a CoAP message.
-const PayloadMarker = 0xFF
+const (
+	// MaxMessageLength is the default maximum length of entire message.
+	MaxMessageLength = 65535
+
+	// MaxPayloadLength is default maximum length of a payload.
+	MaxPayloadLength = 65535 - HeaderLength - 1
+
+	// MaxOptions is the default maximum number of options.
+	MaxOptions = 256
+
+	// MaxOptionLength is the default maximum length of an individual option value.
+	MaxOptionLength = 1024
+
+	// PayloadMarker is the marker byte that indicates the presence of a payload in a CoAP message.
+	PayloadMarker = 0xFF
+)
 
 // Message represents a CoAP message, which includes a header, options, and an optional payload.
 type Message struct {
@@ -11,6 +25,24 @@ type Message struct {
 	Options
 
 	Payload []byte
+}
+
+// DecodeOptions holds options for encoding a CoAP message.
+type DecodeOptions struct {
+	// Schema
+	Schema *Schema
+
+	// MaxMessageLength is the maximum length of entire message.
+	MaxMessageLength uint
+
+	// MaxPayloadLength is the maximum length of payload.
+	MaxPayloadLength uint
+
+	// MaxOptions is the maximum number of options to encode.
+	MaxOptions uint
+
+	// MaxOptionLength is the maximum size of an individual option.
+	MaxOptionLength uint16
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler
@@ -38,22 +70,30 @@ func (m *Message) AppendBinary(data []byte) ([]byte, error) {
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler
 func (m *Message) UnmarshalBinary(data []byte) error {
-	_, err := m.Decode(data, DefaultSchema)
+	_, err := m.Decode(data, DecodeOptions{})
 	return err
 }
 
 // Decode decodes the CoAP message from the provided data slice using the given schema.
 //
 // Returns the remaining data after the message and UnarshalError if any error occurs during decoding.
-func (m *Message) Decode(data []byte, schema *Schema) ([]byte, error) {
-	if schema == nil {
-		schema = DefaultSchema
+func (m *Message) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
+	if opts.MaxMessageLength == 0 {
+		opts.MaxMessageLength = MaxMessageLength
+	}
+
+	if opts.MaxPayloadLength == 0 {
+		opts.MaxPayloadLength = MaxPayloadLength
 	}
 
 	length := len(data)
+	if length > int(opts.MaxMessageLength) {
+		return data, MessageTooLong{
+			Length: uint(length),
+		}
+	}
 
-	var err error
-	data, err = m.Header.Decode(data)
+	data, err := m.Header.Decode(data)
 	if err != nil {
 		return data, UnmarshalError{
 			Offset: uint(length - len(data)),
@@ -61,11 +101,22 @@ func (m *Message) Decode(data []byte, schema *Schema) ([]byte, error) {
 		}
 	}
 
-	data, err = m.Options.Decode(data, schema)
+	data, err = m.Options.Decode(data, opts)
 	if err != nil {
 		return data, UnmarshalError{
 			Offset: uint(length - len(data)),
 			Cause:  err,
+		}
+	}
+
+	if len(data) == 0 {
+		return data, nil // no payload
+	}
+
+	if len(data) > int(opts.MaxPayloadLength) {
+		return data, PayloadTooLong{
+			Length: uint(len(data)),
+			Limit:  opts.MaxPayloadLength,
 		}
 	}
 

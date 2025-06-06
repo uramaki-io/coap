@@ -50,8 +50,33 @@ type TruncatedError struct {
 // https://datatracker.ietf.org/doc/html/rfc7252#section-3.1
 type UnsupportedExtendError struct{}
 
+// TooManyOptions is returned when the number of options exceeds the maximum allowed number.
+type TooManyOptions struct {
+	Limit  uint
+	Length uint
+}
+
+// PayloadTooLong is returned when the payload length exceeds the maximum allowed length.
+type PayloadTooLong struct {
+	Limit  uint
+	Length uint
+}
+
+// MessageTooLong is returned when the total message length exceeds the maximum allowed length.
+type MessageTooLong struct {
+	Limit  uint
+	Length uint
+}
+
 // OptionNotFound is returned when a requested option is not found in the message options.
 type OptionNotFound struct {
+	OptionDef
+}
+
+// OptionNotRepeateable is returned when an option that is not allowed to be repeated is found more than once in the message options.
+//
+// https://datatracker.ietf.org/doc/html/rfc7252#section-5.4.1
+type OptionNotRepeateable struct {
 	OptionDef
 }
 
@@ -60,13 +85,6 @@ type InvalidOptionValueFormat struct {
 	OptionDef
 	Requested ValueFormat
 	Unknown   reflect.Type
-}
-
-// OptionNotRepeateable is returned when an option that is not allowed to be repeated is found more than once in the message options.
-//
-// https://datatracker.ietf.org/doc/html/rfc7252#section-5.4.1
-type OptionNotRepeateable struct {
-	OptionDef
 }
 
 // InvalidOptionValueLength is returned when the length of an option value does not match the expected length.
@@ -101,6 +119,18 @@ func (e UnsupportedTokenLength) Error() string {
 
 func (e UnsupportedExtendError) Error() string {
 	return "unsupported extend value"
+}
+
+func (e TooManyOptions) Error() string {
+	return fmt.Sprintf("too many options, max %d, got %d", e.Limit, e.Length)
+}
+
+func (e PayloadTooLong) Error() string {
+	return fmt.Sprintf("payload too long, max %d bytes, got %d bytes", e.Limit, e.Length)
+}
+
+func (e MessageTooLong) Error() string {
+	return fmt.Sprintf("message too long, max %d bytes, got %d bytes", e.Limit, e.Length)
 }
 
 func (e TruncatedError) Error() string {
