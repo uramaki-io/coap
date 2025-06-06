@@ -94,6 +94,7 @@ func TestOptionRoundtrip(t *testing.T) {
 			name:   "unrecognized option",
 			option: UnrecognizedOptionDef(0xFFFF),
 			data:   []byte{0xE0, 0xFE, 0xF2},
+			value:  []byte(nil),
 		},
 	}
 

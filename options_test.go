@@ -89,37 +89,22 @@ func TestOptionsGetSet(t *testing.T) {
 	}
 }
 
-func EquateOptions() cmp.Option {
-	return cmp.Options{
-		cmp.Transformer("Options", func(o Options) []string {
-			data := SortOptions(o)
-			opts := make([]string, 0, len(data))
-			for _, opt := range data {
-				opts = append(opts, opt.String())
-			}
-
-			return opts
-		}),
-		cmpopts.IgnoreUnexported(Option{}),
-	}
-}
-
 func TestOptionsDecodeUnrecognized(t *testing.T) {
 	tests := []struct {
 		name    string
 		data    []byte
-		options []Option
+		options Options
 		err     error
 	}{
 		{
 			name:    "ignore unrecognized elective option",
 			data:    []byte{0xE0, 0xFE, 0xF1},
-			options: []Option{},
+			options: Options{},
 		},
 		{
 			name: "multiple occurences of non-repeatable elective option",
 			data: []byte{0x72, 0x42, 0x42, 0x02, 0x42, 0x42},
-			options: []Option{
+			options: Options{
 				MustOptionValue(URIPort, uint32(0x4242)),
 				MustOptionValue(UnrecognizedOptionDef(URIPort.Code), []byte{}),
 			},
@@ -139,5 +124,20 @@ func TestOptionsDecodeUnrecognized(t *testing.T) {
 				t.Errorf("options mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func EquateOptions() cmp.Option {
+	return cmp.Options{
+		cmp.Transformer("Options", func(o Options) []string {
+			data := SortOptions(o)
+			opts := make([]string, 0, len(data))
+			for _, opt := range data {
+				opts = append(opts, opt.String())
+			}
+
+			return opts
+		}),
+		cmpopts.IgnoreUnexported(Option{}),
 	}
 }
