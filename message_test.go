@@ -29,11 +29,11 @@ func TestMessageRoundtrip(t *testing.T) {
 					MessageID: 0x849e,
 					Token:     []byte{0x51, 0x55, 0x77, 0xe8},
 				},
-				Options: MakeOptions(
-					MustMakeOption(URIPath, "Hi"),
-					MustMakeOption(URIPath, "Test"),
-					MustMakeOption(URIQuery, "a=1"),
-				),
+				Options: Options{
+					MustOptionValue(URIPath, "Hi"),
+					MustOptionValue(URIPath, "Test"),
+					MustOptionValue(URIQuery, "a=1"),
+				},
 			},
 		},
 		{
@@ -68,9 +68,9 @@ func TestMessageRoundtrip(t *testing.T) {
 					MessageID: 0x13FD,
 					Token:     []byte{0xD0, 0xE2, 0x4D, 0xAC},
 				},
-				Options: MakeOptions(
-					MustMakeOption(MaxAge, uint32(0x424242)),
-				),
+				Options: Options{
+					MustOptionValue(MaxAge, uint32(0x424242)),
+				},
 				Payload: []byte("Hello"),
 			},
 		},

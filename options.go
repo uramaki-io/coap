@@ -7,14 +7,12 @@ import (
 )
 
 // Options represents a collection of CoAP options.
-type Options struct {
-	data []Option
-}
+type Options []Option
 
 // SortOptions sorts the options by their code in ascending order.
 //
 // Returns a new slice of options sorted by code.
-func SortOptions(options []Option) []Option {
+func SortOptions(options Options) Options {
 	options = slices.Clone(options)
 	slices.SortFunc(options, func(l, r Option) int {
 		return cmp.Compare(l.Code, r.Code)
@@ -23,53 +21,37 @@ func SortOptions(options []Option) []Option {
 	return options
 }
 
-// MakeOptions creates a new Options instance with the provided options.
-func MakeOptions(data ...Option) Options {
-	return Options{
-		data: data,
-	}
-}
-
-// Clone creates a shallow copy of the Options.
-//
-// Opaque values are not copied, so changes to the opaque values in the cloned Options will affect the original Options.
-func (o Options) Clone() Options {
-	return Options{
-		data: slices.Clone(o.data),
-	}
-}
-
 // Contains checks if the given option is present.
 func (o Options) Contains(def OptionDef) bool {
-	i := Index(o.data, def)
+	i := Index(o, def)
 	return i != -1
 }
 
 // Get retrieves the first option matching the definition.
 func (o Options) Get(def OptionDef) (Option, bool) {
-	i := Index(o.data, def)
+	i := Index(o, def)
 	if i == -1 {
 		return Option{}, false
 	}
 
-	return o.data[i], true
+	return o[i], true
 }
 
 // Set creates or updates an option.
 func (o *Options) Set(opt Option) {
-	i := Index(o.data, opt.OptionDef)
+	i := Index(*o, opt.OptionDef)
 	if i == -1 {
-		o.data = append(o.data, opt)
+		*o = append(*o, opt)
 		return
 	}
 
-	o.data[i] = opt
+	(*o)[i] = opt
 }
 
 // GetAll retrieves all options matching the definition.
 func (o Options) GetAll(def OptionDef) iter.Seq[Option] {
 	return func(yield func(Option) bool) {
-		for _, v := range o.data {
+		for _, v := range o {
 			if v.Code != def.Code {
 				continue
 			}
@@ -83,14 +65,9 @@ func (o Options) GetAll(def OptionDef) iter.Seq[Option] {
 
 // ClearOption removes all occurrences of the option with matching code.
 func (o *Options) ClearOption(def OptionDef) {
-	o.data = slices.DeleteFunc(o.data, func(opt Option) bool {
+	*o = slices.DeleteFunc(*o, func(opt Option) bool {
 		return opt.Code == def.Code
 	})
-}
-
-// ClearOptions removes all options.
-func (o *Options) ClearOptions() {
-	o.data = o.data[0:]
 }
 
 // GetValue retrieves the value of the first option matching the definition.
@@ -125,7 +102,8 @@ func (o *Options) SetValue(def OptionDef, value any) error {
 
 // GetUint retrieves the value of the first option matching the definition as uint32.
 //
-// Returns OptionNotFound if the option is not present
+// Returns OptionNotFound if the option is not present.
+//
 // Returns InvalidOptionValueFormat if the option value format is not ValueFormatUint.
 func (o Options) GetUint(def OptionDef) (uint32, error) {
 	opt, ok := o.Get(def)
@@ -141,6 +119,7 @@ func (o Options) GetUint(def OptionDef) (uint32, error) {
 // SetUint creates or updates an option with the given value as uint32.
 //
 // Returns InvalidOptionValueFormat if the value format is not ValueFormatUint.
+//
 // Returns InvalidOptionValueLength if the value length does not match the expected length.
 func (o *Options) SetUint(def OptionDef, value uint32) error {
 	opt := Option{
@@ -180,6 +159,7 @@ func (o Options) GetAllUint(def OptionDef) (iter.Seq[uint32], error) {
 // SetAllUint creates or updates all options matching the definition with the given sequence of uint32 values.
 //
 // Returns InvalidOptionValueFormat if the value format is not ValueFormatUint.
+//
 // Returns InvalidOptionValueLength if the value length does not match the expected length.
 func (o *Options) SetAllUint(def OptionDef, values iter.Seq[uint32]) error {
 	if def.ValueFormat != ValueFormatUint {
@@ -204,7 +184,8 @@ func (o *Options) SetAllUint(def OptionDef, values iter.Seq[uint32]) error {
 
 // GetOpaque retrieves the value of the first option matching the definition as []byte.
 //
-// Returns OptionNotFound if the option is not present
+// Returns OptionNotFound if the option is not present.
+//
 // Returns InvalidOptionValueFormat if the value format is not ValueFormatOpaque.
 func (o Options) GetOpaque(def OptionDef) ([]byte, error) {
 	opt, ok := o.Get(def)
@@ -220,6 +201,7 @@ func (o Options) GetOpaque(def OptionDef) ([]byte, error) {
 // SetOpaque creates or updates an option with the given value as []byte.
 //
 // Returns InvalidOptionValueFormat if the value format is not ValueFormatOpaque.
+//
 // Returns InvalidOptionValueLength if the value length does not match the expected length.
 func (o *Options) SetOpaque(def OptionDef, value []byte) error {
 	opt := Option{
@@ -259,6 +241,7 @@ func (o Options) GetAllOpaque(def OptionDef) (iter.Seq[[]byte], error) {
 // SetAllOpaque creates or updates all options matching the definition with the given sequence of []byte values.
 //
 // Returns InvalidOptionValueFormat if the value format is not ValueFormatOpaque.
+//
 // Returns InvalidOptionValueLength if the value length does not match the expected length.
 func (o *Options) SetAllOpaque(def OptionDef, values iter.Seq[[]byte]) error {
 	if def.ValueFormat != ValueFormatOpaque {
@@ -283,7 +266,8 @@ func (o *Options) SetAllOpaque(def OptionDef, values iter.Seq[[]byte]) error {
 
 // GetString retrieves the value of the first option matching the definition as string.
 //
-// Returns OptionNotFound if the option is not present
+// Returns OptionNotFound if the option is not present.
+//
 // Returns InvalidOptionValueFormat if the value format is not ValueFormatString.
 func (o Options) GetString(def OptionDef) (string, error) {
 	opt, ok := o.Get(def)
@@ -317,6 +301,7 @@ func (o *Options) SetString(def OptionDef, value string) error {
 // GetAllString retrieves all options matching the definition as a sequence of string values.
 //
 // Returns InvalidOptionValueFormat if the value format is not ValueFormatString.
+//
 // Returns InvalidOptionValueLength if the value length does not match the expected length.
 func (o Options) GetAllString(def OptionDef) (iter.Seq[string], error) {
 	if def.ValueFormat != ValueFormatString {
@@ -359,33 +344,30 @@ func (o *Options) SetAllString(def OptionDef, values iter.Seq[string]) error {
 	})
 }
 
-// AppendBinary encodes options into the data slice.
+// Encode encodes options into the data slice.
 //
 // If there are no options to encode, it returns the data slice unchanged.
-func (o Options) AppendBinary(data []byte) ([]byte, error) {
-	if len(o.data) == 0 {
-		return data, nil // no options to encode
+func (o Options) Encode(data []byte) []byte {
+	if len(o) == 0 {
+		return data // no options to encode
 	}
 
-	options := SortOptions(o.data)
+	options := SortOptions(o)
 	prev := uint16(0)
 	for _, opt := range options {
-		var err error
-		data, err = opt.Encode(data, prev)
-		if err != nil {
-			return data, err
-		}
-
+		data = opt.Encode(data, prev)
 		prev = opt.Code
 	}
 
-	return data, nil
+	return data
 }
 
 // Decode decodes options from data using schema.
 //
 // Returns the remaining data after options have been decoded.
+//
 // Returns TruncatedError if the data is too short to decode the option.
+//
 // Returns InvalidOptionValueLength if the decoded length does not match the expected length defined in OptionDef.
 //
 // Multiple occurrences of non-repeatable options are treated as unrecognized options.
@@ -422,7 +404,7 @@ func (o *Options) Decode(data []byte, schema *Schema) ([]byte, error) {
 		options = append(options, option)
 	}
 
-	o.data = options
+	*o = options
 	return data, nil
 }
 
@@ -435,11 +417,11 @@ func (o *Options) setAll(def OptionDef, options iter.Seq[Option]) error {
 
 	i := 0
 	for opt := range options {
-		if i == len(o.data) {
+		if i == len(*o) {
 			break
 		}
 
-		loc := Index(o.data[i:], def)
+		loc := Index((*o)[i:], def)
 		if loc == -1 {
 			break
 		}
@@ -453,10 +435,10 @@ func (o *Options) setAll(def OptionDef, options iter.Seq[Option]) error {
 		}
 
 		i += loc
-		o.data[i] = opt
+		(*o)[i] = opt
 	}
 
-	o.data = slices.AppendSeq(o.data, options)
+	*o = slices.AppendSeq(*o, options)
 
 	return nil
 }

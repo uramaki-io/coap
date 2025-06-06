@@ -125,7 +125,11 @@ func EncodeExtend(data []byte, v uint16) (uint8, []byte) {
 
 // DecodeExtend decodes an extended delta or length value from the CoAP header format.
 //
-// Returns the decoded value, the remaining data slice, and an error if any.
+// Returns the decoded value and the remaining data slice, and an error if any.
+//
+// Returns TruncatedError if the data is too short for the expected extend type,
+//
+// Returns UnsupportedExtendError if the extend type is 15.
 func DecodeExtend(data []byte, v uint8) (uint16, []byte, error) {
 	switch v {
 	case ExtendByte:
@@ -152,8 +156,10 @@ func DecodeExtend(data []byte, v uint8) (uint16, []byte, error) {
 // AppendBinary encodes the CoAP message header to the provided data slice.
 //
 // Returns the updated data slice with the header appended and any error encountered during encoding.
-// If the header version is not supported, it returns an UnsupportedVersion error.
-// If the token length exceeds the maximum allowed length, it returns an UnsupportedTokenLength error.
+//
+// Returns an UnsupportedVersion error if the header version does not match the expected ProtocolVersion.
+//
+// Returns an UnsupportedTokenLength error if the token length exceeds the TokenMaxLength.
 func (h Header) AppendBinary(data []byte) ([]byte, error) {
 	if h.Version != ProtocolVersion {
 		return data, UnsupportedVersion{

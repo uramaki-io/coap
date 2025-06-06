@@ -16,6 +16,120 @@ var (
 	bytes272 = slices.Repeat(bytes8, 34)      // length extend dword
 )
 
+func TestOptionRoundtrip(t *testing.T) {
+	tests := []struct {
+		name   string
+		option OptionDef
+		data   []byte
+		value  any
+	}{
+		{
+			name:   "empty value format",
+			option: IfNoneMatch,
+			data:   []byte{0x50},
+		},
+		{
+			name:   "opaque value format",
+			option: IfMatch,
+			data:   append([]byte{0x14}, bytes4...),
+			value:  bytes4,
+		},
+		{
+			name:   "string value format",
+			option: URIHost,
+			data:   append([]byte{0x38}, bytes8...),
+			value:  string(bytes8),
+		},
+		{
+			name:   "uint value format/1",
+			option: URIPort,
+			data:   []byte{0x71, 0x42},
+			value:  uint32(0x42),
+		},
+		{
+			name:   "uint value format/2",
+			option: URIPort,
+			data:   []byte{0x72, 0x42, 0x42},
+			value:  uint32(0x4242),
+		},
+		{
+			name:   "uint value format/3",
+			option: MaxAge,
+			data:   []byte{0xD3, 0x01, 0x42, 0x42, 0x42},
+			value:  uint32(0x424242),
+		},
+		{
+			name:   "uint value format/4",
+			option: MaxAge,
+			data:   []byte{0xD4, 0x01, 0x42, 0x42, 0x42, 0x42},
+			value:  uint32(0x42424242),
+		},
+		{
+			name:   "delta extend byte",
+			option: MaxAge,
+			data:   []byte{0xD0, 0x01},
+			value:  uint32(0),
+		},
+		{
+			name: "delta extend dword",
+			option: OptionDef{
+				Code: 270,
+			},
+			data:  []byte{0xE0, 0x00, 0x01},
+			value: []byte(nil),
+		},
+		{
+			name:   "length extend byte",
+			option: ProxyURI,
+			data:   append([]byte{0xDD, 0x16, 0x03}, bytes16...),
+			value:  string(bytes16),
+		},
+		{
+			name:   "length extend dword",
+			option: ProxyURI,
+			data:   append([]byte{0xDE, 0x16, 0x00, 0x03}, bytes272...),
+			value:  string(bytes272),
+		},
+		{
+			name:   "unrecognized option",
+			option: UnrecognizedOptionDef(0xFFFF),
+			data:   []byte{0xE0, 0xFE, 0xF2},
+		},
+	}
+
+	for _, test := range tests {
+		opt := Option{}
+
+		t.Run(test.name+"/decode", func(t *testing.T) {
+			data, err := opt.Decode(test.data, 0, DefaultSchema)
+			if err != nil {
+				t.Fatal("decode:", err)
+			}
+
+			if len(data) != 0 {
+				t.Errorf("unexpected trailing data: %x", data)
+			}
+
+			if test.option.Code != opt.OptionDef.Code {
+				t.Errorf("option code mismatch, want %v, got %v", test.option, opt.OptionDef)
+			}
+
+			diff := cmp.Diff(test.value, opt.GetValue())
+			if diff != "" {
+				t.Error("option value mismatch (-want +got):\n", diff)
+			}
+		})
+
+		t.Run(test.name+"/encode", func(t *testing.T) {
+			data := opt.Encode(nil, 0)
+			diff := cmp.Diff(test.data, data)
+			if diff != "" {
+				t.Error("encoded data mismatch (-want +got):\n", diff)
+			}
+		})
+	}
+}
+
 func TestOptionSetValue(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -122,119 +236,6 @@ func TestOptionSetValue(t *testing.T) {
 			diff := cmp.Diff(test.err, err, cmpopts.EquateErrors())
 			if diff != "" {
 				t.Errorf("error mismatch (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestOptionRoundtrip(t *testing.T) {
-	tests := []struct {
-		name   string
-		option OptionDef
-		data   []byte
-		value  any
-	}{
-		{
-			name:   "empty value format",
-			option: IfNoneMatch,
-			data:   []byte{0x50},
-		},
-		{
-			name:   "opaque value format",
-			option: IfMatch,
-			data:   append([]byte{0x14}, bytes4...),
-			value:  bytes4,
-		},
-		{
-			name:   "string value format",
-			option: URIHost,
-			data:   append([]byte{0x38}, bytes8...),
-			value:  string(bytes8),
-		},
-		{
-			name:   "uint value format/1",
-			option: URIPort,
-			data:   []byte{0x71, 0x42},
-			value:  uint32(0x42),
-		},
-		{
-			name:   "uint value format/2",
-			option: URIPort,
-			data:   []byte{0x72, 0x42, 0x42},
-			value:  uint32(0x4242),
-		},
-		{
-			name:   "uint value format/3",
-			option: MaxAge,
-			data:   []byte{0xD3, 0x01, 0x42, 0x42, 0x42},
-			value:  uint32(0x424242),
-		},
-		{
-			name:   "uint value format/4",
-			option: MaxAge,
-			data:   []byte{0xD4, 0x01, 0x42, 0x42, 0x42, 0x42},
-			value:  uint32(0x42424242),
-		},
-		{
-			name:   "delta extend byte",
-			option: MaxAge,
-			data:   []byte{0xD0, 0x01},
-			value:  uint32(0),
-		},
-		{
-			name: "delta extend dword",
-			option: OptionDef{
-				Code: 270,
-			},
-			data:  []byte{0xE0, 0x00, 0x01},
-			value: []byte(nil),
-		},
-		{
-			option: ProxyURI,
-			name:   "length extend byte",
-			data:   append([]byte{0xDD, 0x16, 0x03}, bytes16...),
-			value:  string(bytes16),
-		},
-		{
-			option: ProxyURI,
-			name:   "length extend dword",
-			data:   append([]byte{0xDE, 0x16, 0x00, 0x03}, bytes272...),
-			value:  string(bytes272),
-		},
-	}
-
-	for _, test := range tests {
-		opt := Option{}
-
-		t.Run(test.name+"/decode", func(t *testing.T) {
-			data, err := opt.Decode(test.data, 0, DefaultSchema)
-			if err != nil {
-				t.Fatal("decode:", err)
-			}
-
-			if len(data) != 0 {
-				t.Errorf("unexpected trailing data: %x", data)
-			}
-
-			if test.option.Code != opt.OptionDef.Code {
-				t.Errorf("option code mismatch, want %v, got %v", test.option, opt.OptionDef)
-			}
-
-			diff := cmp.Diff(test.value, opt.GetValue())
-			if diff != "" {
-				t.Error("option value mismatch (-want +got):\n", diff)
-			}
-		})
-
-		t.Run(test.name+"/encode", func(t *testing.T) {
-			data, err := opt.Encode(nil, 0)
-			if err != nil {
-				t.Fatal("encode:", err)
-			}
-
-			diff := cmp.Diff(test.data, data)
-			if diff != "" {
-				t.Error("encoded data mismatch (-want +got):\n", diff)
 			}
 		})
 	}

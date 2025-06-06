@@ -43,9 +43,7 @@ var DefaultSchema = NewSchema().
 		MediaTypeApplicationCBORSeq,
 	)
 
-// Schema contains defintions of options and media types used in encoding and decoding CoAP messages.
-//
-// Provides methods to add and retrieve options and media types by their code.
+// Schema contains definitions of CoAP options and media types.
 type Schema struct {
 	options    map[uint16]OptionDef
 	mediaTypes map[uint16]MediaType
@@ -78,6 +76,8 @@ func (s *Schema) AddMediaTypes(mediaTypes ...MediaType) *Schema {
 }
 
 // Option retrieves an option by code.
+//
+// If the option is not recognized, it returns an UnrecognizedOptionDef with given code.
 func (s *Schema) Option(code uint16) OptionDef {
 	option, ok := s.options[code]
 	if !ok {
@@ -88,6 +88,8 @@ func (s *Schema) Option(code uint16) OptionDef {
 }
 
 // MediaType retrieves a media type by code.
+//
+// If the media type is not recognized, it returns an UnrecognizedMediaType with given code.
 func (s *Schema) MediaType(code uint16) MediaType {
 	mediaType, ok := s.mediaTypes[code]
 	if !ok {

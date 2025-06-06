@@ -26,10 +26,7 @@ func (m *Message) AppendBinary(data []byte) ([]byte, error) {
 		return data, err
 	}
 
-	data, err = m.Options.AppendBinary(data)
-	if err != nil {
-		return data, err
-	}
+	data = m.Options.Encode(data)
 
 	if len(m.Payload) != 0 {
 		data = append(data, PayloadMarker)

@@ -76,7 +76,7 @@ type InvalidOptionValueLength struct {
 }
 
 func (e UnmarshalError) Error() string {
-	return fmt.Sprintf("parse error at offset %d: %v", e.Offset, e.Cause)
+	return fmt.Sprintf("unmarshal error at offset %d: %v", e.Offset, e.Cause)
 }
 
 func (e UnmarshalError) Unwrap() error {

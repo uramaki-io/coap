@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func TestRequestRoundtrip(t *testing.T) {
@@ -33,12 +34,12 @@ func TestRequestRoundtrip(t *testing.T) {
 					"a=1",
 				},
 			},
-			options: MakeOptions(
-				MustMakeOption(URIHost, "example.com"),
-				MustMakeOption(URIPort, uint32(5683)),
-				MustMakeOption(URIPath, "test"),
-				MustMakeOption(URIQuery, "a=1"),
-			),
+			options: Options{
+				MustOptionValue(URIHost, "example.com"),
+				MustOptionValue(URIPort, uint32(5683)),
+				MustOptionValue(URIPath, "test"),
+				MustOptionValue(URIQuery, "a=1"),
+			},
 		},
 	}
 
@@ -67,6 +68,49 @@ func TestRequestRoundtrip(t *testing.T) {
 			diff := cmp.Diff(test.request, req, EquateOptions())
 			if diff != "" {
 				t.Errorf("request mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestRequestDecodeError(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+		err  error
+	}{
+		{
+			name: "invalid type",
+			data: []byte{0x70, 0xa0, 0x00, 0x00},
+			err: InvalidType{
+				Type: Reset,
+			},
+		},
+		{
+			name: "invalid code",
+			data: []byte{0x50, 0x41, 0x42, 0x42},
+			err: InvalidCode{
+				Code: Code(Created),
+			},
+		},
+		{
+			name: "truncated request",
+			data: []byte{0x44, 0x01, 0x00, 0x01, 0xD0, 0xE2, 0x4D},
+			err: UnmarshalError{
+				Offset: 4,
+				Cause: TruncatedError{
+					Expected: 4,
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req := &Request{}
+			err := req.UnmarshalBinary(test.data)
+			diff := cmp.Diff(test.err, err, cmpopts.EquateErrors())
+			if diff != "" {
+				t.Errorf("error mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

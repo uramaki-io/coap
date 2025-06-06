@@ -93,7 +93,11 @@ const (
 	HopLimitReached      ResponseCode = 0xa8
 )
 
-// AppendBinary implements encoding.BinaryAppender.
+// AppendBinary appends the binary representation of the Response to the provided data slice.
+//
+// Returns InvalidType if type is out of range.
+//
+// Returns InvalidCode if code is not a valid response code.
 func (r *Response) AppendBinary(data []byte) ([]byte, error) {
 	if r.Type > Reset {
 		return data, InvalidType{
@@ -108,7 +112,7 @@ func (r *Response) AppendBinary(data []byte) ([]byte, error) {
 		}
 	}
 
-	options := r.Options.Clone()
+	options := slices.Clone(r.Options)
 
 	if r.ContentFormat != nil {
 		options.SetUint(ContentFormat, uint32(r.ContentFormat.Code))

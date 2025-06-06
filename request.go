@@ -111,7 +111,7 @@ func (r *Request) AppendBinary(data []byte) ([]byte, error) {
 		}
 	}
 
-	options := r.Options.Clone()
+	options := slices.Clone(r.Options)
 
 	if r.Host != "" {
 		Must(options.SetString(URIHost, r.Host))
@@ -153,6 +153,7 @@ func (r *Request) UnmarshalBinary(data []byte) error {
 // Decode decodes a CoAP request message from the given data using the provided schema.
 //
 // Returns UnsupportedType error if the message type is not Confirmable or NonConfirmable.
+//
 // Returns UnsupportedCode error if the message code is not a valid request method (0.xx).
 func (r *Request) Decode(data []byte, schema *Schema) ([]byte, error) {
 	if schema == nil {
@@ -168,7 +169,7 @@ func (r *Request) Decode(data []byte, schema *Schema) ([]byte, error) {
 
 	if msg.Type != Confirmable && msg.Type != NonConfirmable {
 		return data, InvalidType{
-			Type: r.Type,
+			Type: msg.Type,
 		}
 	}
 
