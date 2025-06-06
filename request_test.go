@@ -115,3 +115,38 @@ func TestRequestDecodeError(t *testing.T) {
 		})
 	}
 }
+
+func TestRequestAppendBinaryErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		request *Request
+		err     error
+	}{
+		{
+			name: "invalid type",
+			request: &Request{
+				Type:   Reset, // not Confirmable or NonConfirmable
+				Method: GET,
+			},
+			err: InvalidType{Type: Reset},
+		},
+		{
+			name: "invalid code",
+			request: &Request{
+				Type:   Confirmable,
+				Method: Method(Created), // not a valid request method (should be 0.xx)
+			},
+			err: InvalidCode{Code: Code(Created)},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := test.request.AppendBinary(nil)
+			diff := cmp.Diff(test.err, err, cmpopts.EquateErrors())
+			if diff != "" {
+				t.Errorf("error mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}

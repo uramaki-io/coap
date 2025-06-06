@@ -63,11 +63,16 @@ func (o Options) GetAll(def OptionDef) iter.Seq[Option] {
 	}
 }
 
-// ClearOption removes all occurrences of the option with matching code.
-func (o *Options) ClearOption(def OptionDef) {
+// Clear removes all occurrences of the option with matching code.
+//
+// Returns number of options removed.
+func (o *Options) Clear(def OptionDef) int {
+	length := len(*o)
 	*o = slices.DeleteFunc(*o, func(opt Option) bool {
 		return opt.Code == def.Code
 	})
+
+	return length - len(*o)
 }
 
 // GetValue retrieves the value of the first option matching the definition.
