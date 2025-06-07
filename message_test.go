@@ -8,15 +8,19 @@ import (
 )
 
 func FuzzMessageDecode(f *testing.F) {
-	f.Add([]byte{0x44, 0x01, 0x84, 0x9e, 0x51, 0x55, 0x77, 0xe8}) // Valid header
-	f.Add([]byte{0x70, 0xa0, 0x42, 0x42})                         // Reset header
-	f.Add([]byte{0x44, 0x01, 0x00, 0x01, 0xD0, 0xE2, 0x4D})       // Truncated header
+	f.Add([]byte{0x44, 0x01, 0x84, 0x9e, 0x51, 0x55, 0x77, 0xe8})                                     // Valid header
+	f.Add([]byte{0x70, 0xa0, 0x42, 0x42})                                                             // Reset header
+	f.Add([]byte{0x44, 0x01, 0x00, 0x01, 0xD0, 0xE2, 0x4D})                                           // Truncated header
+	f.Add([]byte{0x64, 0x45, 0x13, 0xFD, 0xD0, 0xE2, 0x4D, 0xAC, 0xFF, 0x48, 0x65, 0x6C, 0x6C, 0x6F}) // Message with payload
 
 	// ensure values are within valid ranges and there is no panic
 	f.Fuzz(func(t *testing.T, data []byte) {
 		msg := Message{}
 		opts := DecodeOptions{
+			MaxMessageLength: 1472,
 			MaxPayloadLength: 16,
+			MaxOptions:       128,
+			MaxOptionLength:  1034,
 		}
 		_, err := msg.Decode(data, opts)
 		if err != nil {
@@ -42,14 +46,14 @@ func FuzzMessageDecode(f *testing.F) {
 			t.Errorf("payload length exceeds maximum of %d bytes", opts.MaxPayloadLength)
 		}
 
-		for _, opt := range msg.Options {
-			if opt.Length() > MaxOptionLength {
-				t.Errorf("option value length %d exceeds maximum of %d bytes", opt.Length(), MaxOptionLength)
-			}
+		if len(msg.Options) > int(opts.MaxOptions) {
+			t.Errorf("number of options %d exceeds maximum of %d", len(msg.Options), MaxOptions)
 		}
 
-		if len(msg.Options) > MaxOptions {
-			t.Errorf("number of options %d exceeds maximum of %d", len(msg.Options), MaxOptions)
+		for _, opt := range msg.Options {
+			if opt.Length() > opts.MaxOptionLength {
+				t.Errorf("option value length %d exceeds maximum of %d bytes", opt.Length(), MaxOptionLength)
+			}
 		}
 	})
 }

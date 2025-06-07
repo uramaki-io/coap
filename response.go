@@ -22,14 +22,14 @@ type Response struct {
 	// Options
 	Options Options
 
+	// ContentFormat overrides ContentFormat option if set.
+	ContentFormat *MediaType
+
 	// LocationPath overrides LocationPath option if not empty.
 	LocationPath string
 
 	// LocationQuery overrides LocationQuery options if not empty.
 	LocationQuery []string
-
-	// ContentFormat overrides ContentFormat option if set.
-	ContentFormat *MediaType
 
 	// Payload
 	Payload []byte
@@ -51,14 +51,6 @@ const (
 	Content  ResponseCode = 0x45
 	Continue ResponseCode = 0x46
 )
-
-// String implements fmt.Stringer.
-func (c ResponseCode) String() string {
-	class := (c & 0xe0) >> 5
-	detail := c & 0x1f
-
-	return fmt.Sprintf("%d.%02d", class, detail)
-}
 
 // Client Error 4.xx Response Codes
 //
@@ -92,6 +84,16 @@ const (
 	ProxyingNotSupported ResponseCode = 0xa5
 	HopLimitReached      ResponseCode = 0xa8
 )
+
+func (r *Response) String() string {
+	return fmt.Sprintf("Response(Type=%s, MessageID=%d, Code=%s, LocationPath=%s, LocationQuery=%v)",
+		r.Type,
+		r.MessageID,
+		r.Code,
+		r.LocationPath,
+		r.LocationQuery,
+	)
+}
 
 // AppendBinary appends the binary representation of the Response to the provided data slice.
 //
@@ -144,4 +146,12 @@ func (r *Response) AppendBinary(data []byte) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+// String implements fmt.Stringer.
+func (c ResponseCode) String() string {
+	class := (c & 0xe0) >> 5
+	detail := c & 0x1f
+
+	return fmt.Sprintf("%d.%02d", class, detail)
 }

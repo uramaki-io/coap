@@ -62,7 +62,12 @@ const (
 
 // String implements fmt.Stringer.
 func (r *Request) String() string {
-	return fmt.Sprintf("Request(Type=%s, MessageID=%d, Method=%s, Path=%s)", r.Type, r.MessageID, r.Method, r.Path)
+	return fmt.Sprintf("Request(Type=%s, MessageID=%d, Method=%s, Path=%s)",
+		r.Type,
+		r.MessageID,
+		r.Method,
+		r.Path,
+	)
 }
 
 var methodString = map[Method]string{
