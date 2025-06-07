@@ -116,7 +116,7 @@ func TestRequestDecodeError(t *testing.T) {
 	}
 }
 
-func TestRequestAppendBinaryErrors(t *testing.T) {
+func TestRequestAppendBinaryError(t *testing.T) {
 	tests := []struct {
 		name    string
 		request *Request
@@ -148,5 +148,18 @@ func TestRequestAppendBinaryErrors(t *testing.T) {
 				t.Errorf("error mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestRequestString(t *testing.T) {
+	req := &Request{
+		Type:      Confirmable,
+		MessageID: 123,
+		Method:    GET,
+		Path:      "/foo/bar",
+	}
+	want := "Request(Type=CON, MessageID=123, Method=GET, Path=/foo/bar)"
+	if got := req.String(); got != want {
+		t.Errorf("String() = %q, want %q", got, want)
 	}
 }

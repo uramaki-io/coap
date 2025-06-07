@@ -3,8 +3,13 @@ github_checks:
 
 coverage:
   status:
-    patch: off
-    project: off
+    project:
+      default:
+        informational: true
+      only_pulls: true
+    patch:
+      default:
+        informational: true
 
 comment:
   layout: "diff, flags, files"
