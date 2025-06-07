@@ -76,7 +76,13 @@ func (m *Message) UnmarshalBinary(data []byte) error {
 
 // Decode decodes the CoAP message from the provided data slice using the given schema.
 //
-// Returns the remaining data after the message and UnarshalError if any error occurs during decoding.
+// Returns the remaining data after the message.
+//
+// Returns MessageTooLong if the message exceeds the maximum length.
+//
+// Returns PayloadTooLong if the payload exceeds the maximum length.
+//
+// Returns UnmarshalError if there is an error decoding the header or options.
 func (m *Message) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
 	if opts.MaxMessageLength == 0 {
 		opts.MaxMessageLength = MaxMessageLength
@@ -89,6 +95,7 @@ func (m *Message) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
 	length := len(data)
 	if length > int(opts.MaxMessageLength) {
 		return data, MessageTooLong{
+			Limit:  opts.MaxMessageLength,
 			Length: uint(length),
 		}
 	}
@@ -113,6 +120,8 @@ func (m *Message) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
 		return data, nil // no payload
 	}
 
+	data = data[1:] // remove payload marker
+
 	if len(data) > int(opts.MaxPayloadLength) {
 		return data, PayloadTooLong{
 			Length: uint(len(data)),
@@ -120,11 +129,8 @@ func (m *Message) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
 		}
 	}
 
-	// payload exists if marker was present when decoding options
-	if len(data) > 1 {
-		m.Payload = slices.Clone(data[1:])
-		data = data[len(data):]
-	}
+	m.Payload = slices.Clone(data)
+	data = data[len(data):]
 
 	return data, nil
 }

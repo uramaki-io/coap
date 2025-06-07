@@ -151,10 +151,11 @@ func TestMessageRoundtrip(t *testing.T) {
 	}
 }
 
-func TestMessageUnmarshalError(t *testing.T) {
+func TestMessageDecodeError(t *testing.T) {
 	tests := []struct {
 		name string
 		data []byte
+		opts DecodeOptions
 		err  error
 	}{
 		{
@@ -210,11 +211,39 @@ func TestMessageUnmarshalError(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "message too long",
+			data: []byte{
+				0x64, 0x45, 0x13, 0xFD, 0xD0, 0xE2, 0x4D, 0xAC, // Header
+				0xFF, 0x48, 0x65, 0x6C, 0x6C, 0x6F, // Payload "Hello"
+			},
+			opts: DecodeOptions{
+				MaxMessageLength: 10,
+			},
+			err: MessageTooLong{
+				Limit:  10,
+				Length: 14,
+			},
+		},
+		{
+			name: "payload too long",
+			data: []byte{
+				0x64, 0x45, 0x13, 0xFD, 0xD0, 0xE2, 0x4D, 0xAC, // Header
+				0xFF, 0x48, 0x65, 0x6C, 0x6C, 0x6F, // Payload "Hello"
+			},
+			opts: DecodeOptions{
+				MaxPayloadLength: 2,
+			},
+			err: PayloadTooLong{
+				Limit:  2,
+				Length: 5,
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			msg := &Message{}
-			err := msg.UnmarshalBinary(test.data)
+			_, err := msg.Decode(test.data, test.opts)
 
 			diff := cmp.Diff(test.err, err, cmpopts.EquateErrors())
 			if diff != "" {
