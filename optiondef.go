@@ -1,7 +1,5 @@
 package coap
 
-import "strconv"
-
 // revive:disable:exported
 
 var (
@@ -100,12 +98,10 @@ var valueFormatString = map[ValueFormat]string{
 }
 
 // String implements fmt.Stringer for ValueFormat.
-//
-// Panic if ValueFormat is unknown.
 func (f ValueFormat) String() string {
 	s, ok := valueFormatString[f]
 	if !ok {
-		panic("unknown value format: " + strconv.FormatUint(uint64(f), 10))
+		return "unknown"
 	}
 
 	return s
