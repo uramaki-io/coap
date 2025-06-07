@@ -401,7 +401,7 @@ func (o *Options) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
 		// Each occurence of non-repeatable option has to be treated as unrecognized
 		// https://datatracker.ietf.org/doc/html/rfc7252#section-5.4.5
 		if !option.Repeatable && option.Code == prev {
-			option.OptionDef = UnrecognizedOptionDef(option.Code)
+			option.OptionDef = UnrecognizedOptionDef(option.Code, opts.MaxOptionLength)
 		}
 
 		prev = option.Code

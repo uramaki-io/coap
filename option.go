@@ -352,7 +352,7 @@ func (o *Option) Decode(data []byte, prev uint16, opts DecodeOptions) ([]byte, e
 
 	// lookup option definition
 	code := prev + delta
-	o.OptionDef = opts.Schema.Option(code)
+	o.OptionDef = opts.Schema.Option(code, opts.MaxOptionLength)
 
 	// check length against option definition
 	o.MaxLen = min(o.OptionDef.MaxLen, opts.MaxOptionLength)

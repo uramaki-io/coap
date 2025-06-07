@@ -10,23 +10,27 @@ func TestOptionDefMethods(t *testing.T) {
 		critical   bool
 		unsafe     bool
 		noCacheKey bool
+		str        string
 	}{
 		{
 			name:       "critical",
 			def:        IfMatch,
 			recognized: true,
 			critical:   true,
+			str:        "Option(Name=IfMatch, Code=1, ValueFormat=Opaque, Repeatable=false, MinLen=0, MaxLen=8)",
 		},
 		{
 			name:       "no-cache-key",
 			def:        Size1,
 			recognized: true,
 			noCacheKey: true,
+			str:        "Option(Name=Size1, Code=1, ValueFormat=Uint, Repeatable=false, MinLen=0, MaxLen=0)",
 		},
 		{
 			name:   "unrecognized, unsafe",
-			def:    UnrecognizedOptionDef(MaxAge.Code),
+			def:    UnrecognizedOptionDef(MaxAge.Code, MaxOptionLength),
 			unsafe: true,
+			str:    "Option(Code=14, ValueFormat=Opaque, MaxLen=1024)",
 		},
 	}
 
