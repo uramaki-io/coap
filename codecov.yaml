@@ -1,0 +1,10 @@
+github_checks:
+  annotations: false
+
+coverage:
+  status:
+    patch: off
+    project: off
+
+comment:
+  layout: "diff, flags, files"
