@@ -13,4 +13,8 @@ The library supports **UDP** and **DTLS** protocols.
 
 ## Structure
 
-The `Message` type represents a complete CoAP message, encapsulating the protocol's header, options, and payload.
+### Encoding
+
+* `Message` type represents a complete CoAP message, encapsulating the protocol's header, options, and payload.
+* `Request` type models a CoAP request, adding fields and validations for response code and commonly used options.
+* `Response` type models a CoAP response, adding fields and validations for request method and commonly used options.

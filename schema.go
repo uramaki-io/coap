@@ -78,10 +78,10 @@ func (s *Schema) AddMediaTypes(mediaTypes ...MediaType) *Schema {
 // Option retrieves an option by code.
 //
 // If the option is not recognized, it returns an UnrecognizedOptionDef with given code.
-func (s *Schema) Option(code uint16) OptionDef {
+func (s *Schema) Option(code uint16, maxLen uint16) OptionDef {
 	option, ok := s.options[code]
 	if !ok {
-		return UnrecognizedOptionDef(code)
+		return UnrecognizedOptionDef(code, maxLen)
 	}
 
 	return option

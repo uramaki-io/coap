@@ -1,5 +1,7 @@
 package coap
 
+import "fmt"
+
 // revive:disable:exported
 
 var (
@@ -57,11 +59,11 @@ const (
 )
 
 // UnrecognizedOptionDef creates an OptionDef for an unrecognized option code.
-func UnrecognizedOptionDef(code uint16) OptionDef {
+func UnrecognizedOptionDef(code uint16, maxLen uint16) OptionDef {
 	return OptionDef{
 		Code:        code,
 		ValueFormat: ValueFormatOpaque,
-		MaxLen:      1034,
+		MaxLen:      maxLen,
 	}
 }
 
@@ -87,7 +89,12 @@ func (o OptionDef) NoCacheKey() bool {
 
 // String implements fmt.Stringer.
 func (o OptionDef) String() string {
-	return o.Name
+	switch {
+	case o.Recognized():
+		return fmt.Sprintf("Option(Name=%s, Code=%d, ValueFormat=%s, MinLen=%d, MaxLen=%d)", o.Name, o.Code, o.ValueFormat, o.MinLen, o.MaxLen)
+	default:
+		return fmt.Sprintf("Option(Code=%d, ValueFormat=%s, MaxLen=%d)", o.Code, o.ValueFormat, o.MaxLen)
+	}
 }
 
 var valueFormatString = map[ValueFormat]string{
