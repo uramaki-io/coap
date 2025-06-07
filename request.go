@@ -155,7 +155,9 @@ func (r *Request) UnmarshalBinary(data []byte) error {
 	return err
 }
 
-// Decode decodes a CoAP request message from the given data using the provided schema.
+// Decode decodes Request from the given data using the provided options.
+//
+// Returns UnmarshalError if the message cannot be decoded.
 //
 // Returns UnsupportedType error if the message type is not Confirmable or NonConfirmable.
 //
@@ -180,6 +182,13 @@ func (r *Request) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
 		}
 	}
 
+	r.Type = msg.Type
+	r.Method = Method(msg.Code)
+	r.MessageID = msg.MessageID
+	r.Token = msg.Token
+	r.Options = msg.Options
+	r.Payload = msg.Payload
+
 	host, ok := msg.Get(URIHost)
 	if ok {
 		r.Host = MustValue(host.GetString())
@@ -190,15 +199,10 @@ func (r *Request) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
 		r.Port = uint16(MustValue(port.GetUint()))
 	}
 
-	path := DecodePath(MustValue(msg.GetAllString(URIPath)))
-	query := MustValue(msg.GetAllString(URIQuery))
+	path := MustValue(msg.GetAllString(URIPath))
+	r.Path = DecodePath(path)
 
-	r.Type = msg.Type
-	r.Method = Method(msg.Code)
-	r.MessageID = msg.MessageID
-	r.Token = msg.Token
-	r.Options = msg.Options
-	r.Path = path
+	query := MustValue(msg.GetAllString(URIQuery))
 	r.Query = slices.Collect(query)
 
 	return data, nil

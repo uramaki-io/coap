@@ -86,12 +86,10 @@ const (
 )
 
 func (r *Response) String() string {
-	return fmt.Sprintf("Response(Type=%s, MessageID=%d, Code=%s, LocationPath=%s, LocationQuery=%v)",
+	return fmt.Sprintf("Response(Type=%s, MessageID=%d, Code=%s)",
 		r.Type,
 		r.MessageID,
 		r.Code,
-		r.LocationPath,
-		r.LocationQuery,
 	)
 }
 
@@ -144,6 +142,52 @@ func (r *Response) AppendBinary(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return data, nil
+}
+
+// Decode decodes the Response from the given data using the provided options.
+//
+// Returns UnmarshalError if the message cannot be decoded.
+//
+// Returns InvalidCode if the message code class is not in the range of 2.xx to 5.xx.
+func (r *Response) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
+	if opts.Schema == nil {
+		opts.Schema = DefaultSchema
+	}
+
+	msg := Message{}
+
+	data, err := msg.Decode(data, opts)
+	if err != nil {
+		return data, err
+	}
+
+	if msg.Code.Class() < 2 || msg.Code.Class() > 5 {
+		return data, InvalidCode{
+			Code: msg.Code,
+		}
+	}
+
+	r.Type = msg.Type
+	r.Code = ResponseCode(msg.Code)
+	r.MessageID = msg.MessageID
+	r.Token = msg.Token
+	r.Options = msg.Options
+	r.Payload = msg.Payload
+
+	contentFormat, ok := r.Options.Get(ContentFormat)
+	if ok {
+		code := MustValue(contentFormat.GetUint())
+		mediaType := opts.Schema.MediaType(uint16(code))
+		r.ContentFormat = &mediaType
+	}
+
+	path := MustValue(r.Options.GetAllString(LocationPath))
+	r.LocationPath = DecodePath(path)
+
+	query := MustValue(r.Options.GetAllString(LocationQuery))
+	r.LocationQuery = slices.Collect(query)
 
 	return data, nil
 }
