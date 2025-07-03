@@ -70,9 +70,8 @@ type Writer struct {
 
 // RetransmitQueue manages retransmission of Confirmable messages until they are acknowledged or the maximum retransmission limit/time is reached.
 type RetransmitQueue struct {
-	writer *Writer
-	opts   RetransmitOptions
-	data   []WriteOp
+	opts RetransmitOptions
+	data []WriteOp
 }
 
 // WriteOp represents a write operation for a Confirmable message that needs retransmission.
@@ -188,10 +187,8 @@ func (c *Conn) Write(msg *Message, addr net.Addr) error {
 }
 
 func (c *Conn) run() {
-	queue := &RetransmitQueue{
-		writer: c.tx,
-		opts:   c.opts.RetransmitOptions,
-	}
+	queue := NewRetransmitQueue(c.opts.RetransmitOptions)
+	retransmits := []WriteOp{}
 
 	t := time.NewTimer(c.opts.ACKTimeout)
 	defer t.Stop()
@@ -205,7 +202,14 @@ func (c *Conn) run() {
 		case id := <-c.remove:
 			queue.Remove(id)
 		case <-t.C:
-			queue.Retransmit(time.Now())
+			retransmits = queue.Retransmit(time.Now(), retransmits)
+			for _, op := range retransmits {
+				err := c.tx.Write(op.Message, op.Addr)
+				if err != nil {
+					queue.opts.ErrorHandler(op.Message, err)
+					continue
+				}
+			}
 		}
 
 		t.Reset(queue.Next(time.Now()))
@@ -260,18 +264,13 @@ func (w *Writer) Write(msg *Message, addr net.Addr) error {
 // NewRetransmitQueue instantiate a new retransmit queue with the given writer and options.
 //
 // If ErrorHandler is not set, it defaults to NoopRetransmitErrorHandler.
-func NewRetransmitQueue(writer *Writer, opts RetransmitOptions) *RetransmitQueue {
-	if writer == nil {
-		panic("writer is required")
-	}
-
+func NewRetransmitQueue(opts RetransmitOptions) *RetransmitQueue {
 	if opts.ErrorHandler == nil {
 		opts.ErrorHandler = NoopRetransmitErrorHandler
 	}
 
 	return &RetransmitQueue{
-		writer: writer,
-		opts:   opts,
+		opts: opts,
 	}
 }
 
@@ -309,7 +308,9 @@ func (q *RetransmitQueue) Close() {
 // ErrorHandler is called when message retransmission exceeds limits.
 //
 // https://datatracker.ietf.org/doc/html/rfc7252#section-4.8.2
-func (q *RetransmitQueue) Retransmit(now time.Time) {
+func (q *RetransmitQueue) Retransmit(now time.Time, retransmits []WriteOp) []WriteOp {
+	retransmits = retransmits[:0]
+
 	i := 0
 	for _, op := range q.data {
 		switch {
@@ -341,12 +342,7 @@ func (q *RetransmitQueue) Retransmit(now time.Time) {
 			op.Retransmit++
 			op.Next = now.Add(op.Timeout)
 			q.data[i] = op
-
-			err := q.writer.Write(op.Message, op.Addr)
-			if err != nil {
-				q.opts.ErrorHandler(op.Message, err)
-				continue
-			}
+			retransmits = append(retransmits, op)
 		}
 
 		i++
@@ -354,6 +350,8 @@ func (q *RetransmitQueue) Retransmit(now time.Time) {
 
 	// resize after skipping expired ops
 	q.data = slices.Delete(q.data, i, len(q.data))
+
+	return retransmits
 }
 
 // Next returns the next retransmit time.
