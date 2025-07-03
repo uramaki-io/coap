@@ -72,6 +72,7 @@ type Writer struct {
 type RetransmitQueue struct {
 	opts RetransmitOptions
 	data []WriteOp
+	out  []WriteOp
 }
 
 // WriteOp represents a write operation for a Confirmable message that needs retransmission.
@@ -188,7 +189,6 @@ func (c *Conn) Write(msg *Message, addr net.Addr) error {
 
 func (c *Conn) run() {
 	queue := NewRetransmitQueue(c.opts.RetransmitOptions)
-	retransmits := []WriteOp{}
 
 	t := time.NewTimer(c.opts.ACKTimeout)
 	defer t.Stop()
@@ -202,8 +202,8 @@ func (c *Conn) run() {
 		case id := <-c.remove:
 			queue.Remove(id)
 		case <-t.C:
-			retransmits = queue.Retransmit(time.Now(), retransmits)
-			for _, op := range retransmits {
+			writes := queue.Process(time.Now())
+			for _, op := range writes {
 				err := c.tx.Write(op.Message, op.Addr)
 				if err != nil {
 					queue.opts.ErrorHandler(op.Message, err)
@@ -303,13 +303,14 @@ func (q *RetransmitQueue) Close() {
 	q.data = q.data[:0]
 }
 
-// Retransmit retransmits messages that are pending acknowledgement.
+// Process returns messages that need to be retransmitted and removes expired messages.
 //
 // ErrorHandler is called when message retransmission exceeds limits.
 //
 // https://datatracker.ietf.org/doc/html/rfc7252#section-4.8.2
-func (q *RetransmitQueue) Retransmit(now time.Time, retransmits []WriteOp) []WriteOp {
-	retransmits = retransmits[:0]
+func (q *RetransmitQueue) Process(now time.Time) []WriteOp {
+	clear(q.out)
+	q.out = q.out[:0]
 
 	i := 0
 	for _, op := range q.data {
@@ -342,7 +343,7 @@ func (q *RetransmitQueue) Retransmit(now time.Time, retransmits []WriteOp) []Wri
 			op.Retransmit++
 			op.Next = now.Add(op.Timeout)
 			q.data[i] = op
-			retransmits = append(retransmits, op)
+			q.out = append(q.out, op)
 		}
 
 		i++
@@ -351,7 +352,7 @@ func (q *RetransmitQueue) Retransmit(now time.Time, retransmits []WriteOp) []Wri
 	// resize after skipping expired ops
 	q.data = slices.Delete(q.data, i, len(q.data))
 
-	return retransmits
+	return q.out
 }
 
 // Next returns the next retransmit time.
