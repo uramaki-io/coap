@@ -16,7 +16,7 @@ func FuzzMessageDecode(f *testing.F) {
 	// ensure values are within valid ranges and there is no panic
 	f.Fuzz(func(t *testing.T, data []byte) {
 		msg := Message{}
-		opts := DecodeOptions{
+		opts := MarshalOptions{
 			MaxMessageLength: 1472,
 			MaxPayloadLength: 16,
 			MaxOptions:       128,
@@ -74,11 +74,11 @@ func TestMessageRoundtrip(t *testing.T) {
 			},
 			msg: &Message{
 				Header: Header{
-					Version:   ProtocolVersion,
-					Type:      Confirmable,
-					Code:      Code(GET),
-					MessageID: 0x849e,
-					Token:     []byte{0x51, 0x55, 0x77, 0xe8},
+					Version: ProtocolVersion,
+					Type:    Confirmable,
+					Code:    Code(GET),
+					ID:      0x849e,
+					Token:   []byte{0x51, 0x55, 0x77, 0xe8},
 				},
 				Options: Options{
 					MustOptionValue(URIPath, "Hi"),
@@ -95,11 +95,11 @@ func TestMessageRoundtrip(t *testing.T) {
 			},
 			msg: &Message{
 				Header: Header{
-					Version:   ProtocolVersion,
-					Type:      Acknowledgement,
-					Code:      Code(Content),
-					MessageID: 0x13FD,
-					Token:     []byte{0xD0, 0xE2, 0x4D, 0xAC},
+					Version: ProtocolVersion,
+					Type:    Acknowledgement,
+					Code:    Code(Content),
+					ID:      0x13FD,
+					Token:   []byte{0xD0, 0xE2, 0x4D, 0xAC},
 				},
 				Payload: []byte("Hello"),
 			},
@@ -113,11 +113,11 @@ func TestMessageRoundtrip(t *testing.T) {
 			},
 			msg: &Message{
 				Header: Header{
-					Version:   ProtocolVersion,
-					Type:      Acknowledgement,
-					Code:      Code(Content),
-					MessageID: 0x13FD,
-					Token:     []byte{0xD0, 0xE2, 0x4D, 0xAC},
+					Version: ProtocolVersion,
+					Type:    Acknowledgement,
+					Code:    Code(Content),
+					ID:      0x13FD,
+					Token:   []byte{0xD0, 0xE2, 0x4D, 0xAC},
 				},
 				Options: Options{
 					MustOptionValue(MaxAge, uint32(0x424242)),
@@ -159,7 +159,7 @@ func TestMessageDecodeError(t *testing.T) {
 	tests := []struct {
 		name string
 		data []byte
-		opts DecodeOptions
+		opts MarshalOptions
 		err  error
 	}{
 		{
@@ -221,7 +221,7 @@ func TestMessageDecodeError(t *testing.T) {
 				0x64, 0x45, 0x13, 0xFD, 0xD0, 0xE2, 0x4D, 0xAC, // Header
 				0xFF, 0x48, 0x65, 0x6C, 0x6C, 0x6F, // Payload "Hello"
 			},
-			opts: DecodeOptions{
+			opts: MarshalOptions{
 				MaxMessageLength: 10,
 			},
 			err: MessageTooLong{
@@ -235,7 +235,7 @@ func TestMessageDecodeError(t *testing.T) {
 				0x64, 0x45, 0x13, 0xFD, 0xD0, 0xE2, 0x4D, 0xAC, // Header
 				0xFF, 0x48, 0x65, 0x6C, 0x6C, 0x6F, // Payload "Hello"
 			},
-			opts: DecodeOptions{
+			opts: MarshalOptions{
 				MaxPayloadLength: 2,
 			},
 			err: PayloadTooLong{

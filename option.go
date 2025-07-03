@@ -317,7 +317,7 @@ func (o Option) Encode(data []byte, prev uint16) []byte {
 // Returns TruncatedError if the data is too short to decode the option.
 //
 // Returns InvalidOptionValueLength if the decoded length does not match the expected length.
-func (o *Option) Decode(data []byte, prev uint16, opts DecodeOptions) ([]byte, error) {
+func (o *Option) Decode(data []byte, prev uint16, opts MarshalOptions) ([]byte, error) {
 	if opts.Schema == nil {
 		opts.Schema = DefaultSchema
 	}

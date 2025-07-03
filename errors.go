@@ -3,7 +3,17 @@ package coap
 import (
 	"fmt"
 	"reflect"
+	"time"
 )
+
+type RetransmitRetryLimit struct {
+	Retransmit    uint
+	MaxRetransmit uint
+}
+
+type RetransmitWaitLimit struct {
+	MaxTransmitWait time.Duration
+}
 
 // UnsupportedVersion is returned when the version does not match the expected protocol version 1.
 //
@@ -93,8 +103,16 @@ type InvalidOptionValueLength struct {
 	Length uint16
 }
 
+func (e RetransmitRetryLimit) Error() string {
+	return fmt.Sprintf("coap: retransmit retry limit exceeded: %d of %d", e.Retransmit, e.MaxRetransmit)
+}
+
+func (e RetransmitWaitLimit) Error() string {
+	return fmt.Sprintf("coap: retransmit wait limit %s exceeded", e.MaxTransmitWait)
+}
+
 func (e UnmarshalError) Error() string {
-	return fmt.Sprintf("unmarshal error at offset %d: %v", e.Offset, e.Cause)
+	return fmt.Sprintf("coap: unmarshal error at offset %d: %v", e.Offset, e.Cause)
 }
 
 func (e UnmarshalError) Unwrap() error {
@@ -102,39 +120,39 @@ func (e UnmarshalError) Unwrap() error {
 }
 
 func (e UnsupportedVersion) Error() string {
-	return fmt.Sprintf("unsupported version %d, expected %d", e.Version, ProtocolVersion)
+	return fmt.Sprintf("coap: unsupported version %d, expected %d", e.Version, ProtocolVersion)
 }
 
 func (e InvalidType) Error() string {
-	return fmt.Sprintf("invalid type %s", e.Type)
+	return fmt.Sprintf("coap: invalid type %s", e.Type)
 }
 
 func (e InvalidCode) Error() string {
-	return fmt.Sprintf("invalid code %s", e.Code)
+	return fmt.Sprintf("coap: invalid code %s", e.Code)
 }
 
 func (e UnsupportedTokenLength) Error() string {
-	return fmt.Sprintf("unsupported token length %d, max is %d", e.Length, TokenMaxLength)
+	return fmt.Sprintf("coap: unsupported token length %d, max is %d", e.Length, TokenMaxLength)
 }
 
 func (e UnsupportedExtendError) Error() string {
-	return "unsupported extend value"
+	return "coap: unsupported extend value"
 }
 
 func (e TooManyOptions) Error() string {
-	return fmt.Sprintf("too many options, max %d, got %d", e.Limit, e.Length)
+	return fmt.Sprintf("coap: too many options, max %d, got %d", e.Limit, e.Length)
 }
 
 func (e PayloadTooLong) Error() string {
-	return fmt.Sprintf("payload too long, max %d bytes, got %d bytes", e.Limit, e.Length)
+	return fmt.Sprintf("coap: payload too long, max %d bytes, got %d bytes", e.Limit, e.Length)
 }
 
 func (e MessageTooLong) Error() string {
-	return fmt.Sprintf("message too long, max %d bytes, got %d bytes", e.Limit, e.Length)
+	return fmt.Sprintf("coap: message too long, max %d bytes, got %d bytes", e.Limit, e.Length)
 }
 
 func (e TruncatedError) Error() string {
-	return fmt.Sprintf("truncated input, expected %d bytes", e.Expected)
+	return fmt.Sprintf("coap: truncated input, expected %d bytes", e.Expected)
 }
 
 func (e OptionNotFound) Error() string {

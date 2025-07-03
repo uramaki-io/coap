@@ -136,11 +136,11 @@ func (r *Request) AppendBinary(data []byte) ([]byte, error) {
 
 	msg := Message{
 		Header: Header{
-			Version:   ProtocolVersion,
-			Type:      r.Type,
-			Code:      code,
-			MessageID: r.MessageID,
-			Token:     r.Token,
+			Version: ProtocolVersion,
+			Type:    r.Type,
+			Code:    code,
+			ID:      r.MessageID,
+			Token:   r.Token,
 		},
 		Options: options,
 		Payload: r.Payload,
@@ -151,7 +151,7 @@ func (r *Request) AppendBinary(data []byte) ([]byte, error) {
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler
 func (r *Request) UnmarshalBinary(data []byte) error {
-	_, err := r.Decode(data, DecodeOptions{})
+	_, err := r.Decode(data, MarshalOptions{})
 	return err
 }
 
@@ -162,7 +162,7 @@ func (r *Request) UnmarshalBinary(data []byte) error {
 // Returns UnsupportedType error if the message type is not Confirmable or NonConfirmable.
 //
 // Returns UnsupportedCode error if the message code is not a valid request method (0.xx).
-func (r *Request) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
+func (r *Request) Decode(data []byte, opts MarshalOptions) ([]byte, error) {
 	msg := Message{}
 
 	data, err := msg.Decode(data, opts)
@@ -184,7 +184,7 @@ func (r *Request) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
 
 	r.Type = msg.Type
 	r.Method = Method(msg.Code)
-	r.MessageID = msg.MessageID
+	r.MessageID = msg.ID
 	r.Token = msg.Token
 	r.Options = msg.Options
 	r.Payload = msg.Payload

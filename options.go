@@ -377,7 +377,7 @@ func (o Options) Encode(data []byte) []byte {
 //
 // Multiple occurrences of non-repeatable options are treated as unrecognized options.
 // Unrecognized options are silently ignored if they are elective.
-func (o *Options) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
+func (o *Options) Decode(data []byte, opts MarshalOptions) ([]byte, error) {
 	if opts.MaxOptions == 0 {
 		opts.MaxOptions = MaxOptions
 	}

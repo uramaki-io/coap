@@ -54,7 +54,7 @@ func TestResponseRoundtrip(t *testing.T) {
 
 		t.Run(test.name+"/unmarshal", func(t *testing.T) {
 			resp := &Response{}
-			_, err := resp.Decode(test.data, DecodeOptions{})
+			_, err := resp.Decode(test.data, MarshalOptions{})
 			if err != nil {
 				t.Fatal("unmarshal:", err)
 			}
@@ -94,7 +94,7 @@ func TestResponseDecodeError(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			resp := &Response{}
-			_, err := resp.Decode(test.data, DecodeOptions{})
+			_, err := resp.Decode(test.data, MarshalOptions{})
 			diff := cmp.Diff(test.err, err, cmpopts.EquateErrors())
 			if diff != "" {
 				t.Errorf("error mismatch (-want +got):\n%s", diff)

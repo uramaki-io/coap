@@ -16,11 +16,11 @@ func TestHeaderRoundtrip(t *testing.T) {
 		{
 			name: "confirmable GET request",
 			header: Header{
-				Version:   ProtocolVersion,
-				Type:      Confirmable,
-				Code:      Code(GET),
-				MessageID: 0x4242,
-				Token:     bytes4,
+				Version: ProtocolVersion,
+				Type:    Confirmable,
+				Code:    Code(GET),
+				ID:      0x4242,
+				Token:   bytes4,
 			},
 			data: []byte{
 				0x44,       // Version 1, Confirmable, Token Length 4}
@@ -32,22 +32,22 @@ func TestHeaderRoundtrip(t *testing.T) {
 		{
 			name: "reset",
 			header: Header{
-				Version:   ProtocolVersion,
-				Type:      Reset,
-				Code:      Code(InternalServerError),
-				MessageID: 0x4242,
-				Token:     Token{},
+				Version: ProtocolVersion,
+				Type:    Reset,
+				Code:    Code(InternalServerError),
+				ID:      0x4242,
+				Token:   Token{},
 			},
 			data: []byte{0x70, 0xa0, 0x42, 0x42},
 		},
 		{
 			name: "non-confirmable Created response",
 			header: Header{
-				Version:   ProtocolVersion,
-				Type:      NonConfirmable,
-				Code:      Code(Created),
-				MessageID: 0x4242,
-				Token:     Token{},
+				Version: ProtocolVersion,
+				Type:    NonConfirmable,
+				Code:    Code(Created),
+				ID:      0x4242,
+				Token:   Token{},
 			},
 			data: []byte{0x50, 0x41, 0x42, 0x42},
 		},

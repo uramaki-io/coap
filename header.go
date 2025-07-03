@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"hash/fnv"
 	"slices"
 	"sync/atomic"
 )
@@ -28,11 +29,11 @@ const (
 
 // Header represents the CoAP message header.
 type Header struct {
-	Version   uint8
-	Type      Type
-	Code      Code
-	MessageID MessageID
-	Token     Token
+	Version uint8
+	Type    Type
+	Code    Code
+	ID      MessageID
+	Token   Token
 }
 
 // Code represents request method or response code.
@@ -177,7 +178,7 @@ func (h Header) AppendBinary(data []byte) ([]byte, error) {
 	b := uint8(h.Version<<6) | uint8(h.Type<<4) | uint8(tkl)
 	data = append(data, b)
 	data = append(data, uint8(h.Code))
-	data = binary.BigEndian.AppendUint16(data, uint16(h.MessageID))
+	data = binary.BigEndian.AppendUint16(data, uint16(h.ID))
 	data = append(data, h.Token...)
 
 	return data, nil
@@ -224,7 +225,7 @@ func (h *Header) Decode(data []byte) ([]byte, error) {
 	h.Version = version
 	h.Type = tpe
 	h.Code = code
-	h.MessageID = messageID
+	h.ID = messageID
 	h.Token = Token(slices.Clone(data[:tkl]))
 
 	return data[tkl:], nil
@@ -262,4 +263,12 @@ func (t Type) String() string {
 	}
 
 	return s
+}
+
+// Hash generates FNV-1a hash of the token.
+func (t Token) Hash() uint64 {
+	hash := fnv.New64a()
+	_, _ = hash.Write(t)
+
+	return hash.Sum64()
 }

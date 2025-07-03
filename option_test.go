@@ -102,7 +102,7 @@ func TestOptionRoundtrip(t *testing.T) {
 		opt := Option{}
 
 		t.Run(test.name+"/decode", func(t *testing.T) {
-			data, err := opt.Decode(test.data, 0, DecodeOptions{})
+			data, err := opt.Decode(test.data, 0, MarshalOptions{})
 			if err != nil {
 				t.Fatal("decode:", err)
 			}
@@ -306,7 +306,7 @@ func TestOptionDecodeError(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			opt := Option{}
-			_, err := opt.Decode(test.input, 0, DecodeOptions{})
+			_, err := opt.Decode(test.input, 0, MarshalOptions{})
 			diff := cmp.Diff(test.err, err, cmpopts.EquateErrors())
 			if diff != "" {
 				t.Errorf("error mismatch (-want +got):\n%s", diff)

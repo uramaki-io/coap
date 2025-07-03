@@ -27,8 +27,8 @@ type Message struct {
 	Payload []byte
 }
 
-// DecodeOptions holds options for encoding a CoAP message.
-type DecodeOptions struct {
+// MarshalOptions holds options for encoding and decoding a CoAP message.
+type MarshalOptions struct {
 	// Schema
 	Schema *Schema
 
@@ -70,7 +70,7 @@ func (m *Message) AppendBinary(data []byte) ([]byte, error) {
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler
 func (m *Message) UnmarshalBinary(data []byte) error {
-	_, err := m.Decode(data, DecodeOptions{})
+	_, err := m.Decode(data, MarshalOptions{})
 	return err
 }
 
@@ -83,7 +83,7 @@ func (m *Message) UnmarshalBinary(data []byte) error {
 // Returns PayloadTooLong if the payload exceeds the maximum length.
 //
 // Returns UnmarshalError if there is an error decoding the header or options.
-func (m *Message) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
+func (m *Message) Decode(data []byte, opts MarshalOptions) ([]byte, error) {
 	if opts.MaxMessageLength == 0 {
 		opts.MaxMessageLength = MaxMessageLength
 	}

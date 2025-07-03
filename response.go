@@ -128,11 +128,11 @@ func (r *Response) AppendBinary(data []byte) ([]byte, error) {
 
 	msg := Message{
 		Header: Header{
-			Version:   ProtocolVersion,
-			Type:      r.Type,
-			Code:      code,
-			MessageID: r.MessageID,
-			Token:     r.Token,
+			Version: ProtocolVersion,
+			Type:    r.Type,
+			Code:    code,
+			ID:      r.MessageID,
+			Token:   r.Token,
 		},
 		Options: options,
 		Payload: r.Payload,
@@ -151,7 +151,7 @@ func (r *Response) AppendBinary(data []byte) ([]byte, error) {
 // Returns UnmarshalError if the message cannot be decoded.
 //
 // Returns InvalidCode if the message code class is not in the range of 2.xx to 5.xx.
-func (r *Response) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
+func (r *Response) Decode(data []byte, opts MarshalOptions) ([]byte, error) {
 	if opts.Schema == nil {
 		opts.Schema = DefaultSchema
 	}
@@ -171,7 +171,7 @@ func (r *Response) Decode(data []byte, opts DecodeOptions) ([]byte, error) {
 
 	r.Type = msg.Type
 	r.Code = ResponseCode(msg.Code)
-	r.MessageID = msg.MessageID
+	r.MessageID = msg.ID
 	r.Token = msg.Token
 	r.Options = msg.Options
 	r.Payload = msg.Payload
